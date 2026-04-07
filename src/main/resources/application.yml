@@ -15,12 +15,15 @@ server:
     context-path: /api
 # springdoc-openapi
 springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    tags-sorter: alpha
+    operations-sorter: alpha
+    path: /swagger-ui.html
   group-configs:
     - group: 'default'
       packages-to-scan: cn.ko_ai_code.com.koaicode.controller
 # knife4j
-knife4j:
-  enable: true
-  setting:
-    language: zh_cn
 

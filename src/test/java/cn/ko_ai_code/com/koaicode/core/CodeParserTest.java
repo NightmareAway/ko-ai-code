@@ -3,9 +3,11 @@ package cn.ko_ai_code.com.koaicode.core;
 import cn.ko_ai_code.com.koaicode.ai.model.HtmlCodeResult;
 import cn.ko_ai_code.com.koaicode.ai.model.MultiFileCodeResult;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@SpringBootTest
 class CodeParserTest {
 
     @Test

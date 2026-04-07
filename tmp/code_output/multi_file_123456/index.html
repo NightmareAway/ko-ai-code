@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单任务管理器</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-tasks"></i> 我的任务清单</h1>
+            <p class="subtitle">轻松管理您的日常任务</p>
+        </header>
+        
+        <main class="main-content">
+            <section class="add-task-section">
+                <div class="input-group">
+                    <input type="text" id="taskInput" placeholder="输入新任务..." maxlength="100">
+                    <button id="addTaskBtn" class="btn-primary">
+                        <i class="fas fa-plus"></i> 添加任务
+                    </button>
+                </div>
+                <div class="task-stats">
+                    <span id="totalTasks">总任务: 0</span>
+                    <span id="completedTasks">已完成: 0</span>
+                    <span id="pendingTasks">待完成: 0</span>
+                </div>
+            </section>
+            
+            <section class="tasks-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-list-check"></i> 任务列表</h2>
+                    <div class="filter-options">
+                        <button class="filter-btn active" data-filter="all">全部</button>
+                        <button class="filter-btn" data-filter="pending">待完成</button>
+                        <button class="filter-btn" data-filter="completed">已完成</button>
+                    </div>
+                </div>
+                
+                <div class="tasks-container">
+                    <ul id="tasksList">
+                        <!-- 任务将通过JavaScript动态添加 -->
+                        <li class="task-item placeholder">
+                            <p>暂无任务。添加您的第一个任务吧！</p>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="actions">
+                    <button id="clearCompletedBtn" class="btn-secondary">
+                        <i class="fas fa-trash-can"></i> 清除已完成任务
+                    </button>
+                    <button id="clearAllBtn" class="btn-secondary">
+                        <i class="fas fa-broom"></i> 清除所有任务
+                    </button>
+                </div>
+            </section>
+            
+            <section class="instructions">
+                <h3><i class="fas fa-circle-info"></i> 使用说明</h3>
+                <ul>
+                    <li>在输入框中输入任务内容，点击"添加任务"按钮或按Enter键添加新任务</li>
+                    <li>点击任务左侧的复选框可以标记任务为已完成/未完成</li>
+                    <li>点击任务右侧的删除按钮可以删除单个任务</li>
+                    <li>使用筛选按钮可以查看全部、待完成或已完成的任务</li>
+                    <li>使用底部的按钮可以批量清除任务</li>
+                </ul>
+            </section>
+        </main>
+        
+        <footer class="footer">
+            <p>© 2023 简单任务管理器 | 使用原生HTML、CSS和JavaScript构建</p>
+        </footer>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

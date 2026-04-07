@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Task Tracker</h1>
+        <p>Keep track of your daily tasks and stay organized.</p>
+    </header>
+    <main>
+        <section class="task-form">
+            <h2>Add New Task</h2>
+            <form id="taskForm">
+                <input type="text" id="taskTitle" placeholder="Enter task title" required>
+                <textarea id="taskDescription" placeholder="Enter task description (optional)"></textarea>
+                <input type="date" id="taskDueDate" required>
+                <select id="taskPriority">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                </select>
+                <button type="submit">Add Task</button>
+            </form>
+        </section>
+        <section class="task-list">
+            <h2>Your Tasks</h2>
+            <div class="filter-controls">
+                <label for="filterPriority">Filter by Priority:</label>
+                <select id="filterPriority">
+                    <option value="all">All</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+                <button id="clearCompleted">Clear Completed</button>
+            </div>
+            <div id="tasksContainer">
+                <!-- Tasks will be dynamically inserted here -->
+            </div>
+        </section>
+    </main>
+    <footer>
+        <p>© 2023 Task Tracker. All rights reserved.</p>
+    </footer>
+    <script src="script.js"></script>
+</body>
+</html>
