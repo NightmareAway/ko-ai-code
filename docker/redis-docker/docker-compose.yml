@@ -1,0 +1,43 @@
+services:
+  redis:
+    # 采用更轻量安全的 alpine 基础镜像
+    image: redis:${REDIS_VERSION:-7.4}-alpine
+    container_name: redis_server
+    # 重启策略: unless-stopped 适用于绝大多数生产和开发场景
+    restart: unless-stopped
+    ports:
+      # 端口映射: 宿主机端口:容器内端口
+      - "${REDIS_PORT:-6379}:6379"
+    command: >
+      redis-server 
+      --requirepass "${REDIS_PASSWORD}"
+      --maxmemory ${REDIS_MAX_MEMORY:-512mb}
+      --maxmemory-policy ${REDIS_MAX_MEMORY_POLICY:-allkeys-lru}
+      --appendonly yes
+    volumes:
+      # 持久化数据目录挂载
+      - ${REDIS_DATA_DIR:-./redis-data}:/data
+      # 如果需要自定义配置，请在宿主机创建 redis.conf 并取消下方注释
+      # - ${REDIS_CONF_DIR:-./redis-conf}/redis.conf:/usr/local/etc/redis/redis.conf
+    environment:
+      # 设置容器时区，保证日志时间准确
+      - TZ=Asia/Shanghai
+      # 将密码注入到环境变量中，方便健康检查等脚本调用
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    healthcheck:
+      # 健康检查: 定期 ping 服务，确保处于正常响应状态
+      test: ["CMD", "sh", "-c", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          # 容器级别的内存硬限制，需大于 Redis 自身限制 (例如 1G)
+          memory: 1G
+          # 可选：CPU 限制
+          # cpus: '1.0'
+        reservations:
+          # 容器内存预留
+          memory: 256M

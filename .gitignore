@@ -34,3 +34,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### docker ###
+/docker/redis-docker/.env
+/docker/redis-docker/README.md

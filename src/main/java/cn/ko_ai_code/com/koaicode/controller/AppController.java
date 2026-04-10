@@ -19,6 +19,12 @@ import cn.ko_ai_code.com.koaicode.model.vo.AppVO;
 import cn.ko_ai_code.com.koaicode.service.UserService;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
@@ -34,10 +40,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 应用 控制层。
+ * 应用接口
  *
  * @author ko
+ * @version 1.0
+ * @since 2024-01-01
  */
+@Tag(name = "应用管理", description = "提供应用创建、更新、删除、查询及AI代码生成等完整应用管理功能接口")
 @RestController
 @RequestMapping("/app")
 public class AppController {
@@ -49,41 +58,103 @@ public class AppController {
     private UserService userService;
 
     /**
-     * 创建应用
+     * 创建应用接口
      *
-     * @param appAddRequest 创建应用请求
-     * @param request       请求
-     * @return 应用 id
+     * @author ko
+     * @since 2024-01-01
+     * @param appAddRequest 创建应用请求参数（包含初始化prompt）
+     * @param request HTTP请求对象
+     * @return 返回新创建应用的ID
+     *
+     * @example 请求示例:
+     * {
+     *   "initPrompt": "创建一个简单的任务记录网站，包含标题、正文、创建时间等字段"
+     * }
+     *
+     * @example 响应示例:
+     * {
+     *   "code": 0,
+     *   "data": 123456789,
+     *   "message": ""
+     * }
      */
+    @Operation(
+            summary = "创建应用",
+            description = "用户创建一个新应用，需要提供初始化prompt用于配置AI代码生成规则",
+            tags = {"应用管理"},
+            method = "POST",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "创建应用请求参数",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AppAddRequest.class)
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "创建成功，返回应用ID",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误，initPrompt不能为空",
+                            content = @Content)
+            }
+    )
     @PostMapping("/add")
     public BaseResponse<Long> addApp(@RequestBody AppAddRequest appAddRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(appAddRequest == null, ErrorCode.PARAMS_ERROR);
-        // 参数校验
         String initPrompt = appAddRequest.getInitPrompt();
         ThrowUtils.throwIf(StrUtil.isBlank(initPrompt), ErrorCode.PARAMS_ERROR, "初始化 prompt 不能为空");
-        // 获取当前登录用户
         User loginUser = userService.getLoginUser(request);
-        // 构造入库对象
         App app = new App();
         BeanUtil.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
-        // 应用名称暂时为 initPrompt 前 12 位
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
-        // 暂时设置为多文件生成
         app.setCodeGenType(CodeGenTypeEnum.MULTI_FILE.getValue());
-        // 插入数据库
         boolean result = appService.save(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(app.getId());
     }
 
     /**
-     * 更新应用（用户只能更新自己的应用名称）
+     * 更新应用接口
      *
-     * @param appUpdateRequest 更新请求
-     * @param request          请求
-     * @return 更新结果
+     * @author ko
+     * @since 2024-01-01
+     * @param appUpdateRequest 更新应用请求参数
+     * @param request HTTP请求对象
+     * @return 返回更新操作结果
+     *
+     * @example 请求示例:
+     * {
+     *   "id": 123456789,
+     *   "appName": "更新后的应用名称"
+     * }
      */
+    @Operation(
+            summary = "更新应用",
+            description = "用户更新自己的应用信息，目前仅支持更新应用名称，且仅本人可更新",
+            tags = {"应用管理"},
+            method = "POST",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "更新应用请求参数",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AppUpdateRequest.class)
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "更新成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40300", description = "无权限，非本人操作",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40400", description = "应用不存在",
+                            content = @Content)
+            }
+    )
     @PostMapping("/update")
     public BaseResponse<Boolean> updateApp(@RequestBody AppUpdateRequest appUpdateRequest, HttpServletRequest request) {
         if (appUpdateRequest == null || appUpdateRequest.getId() == null) {
@@ -91,17 +162,14 @@ public class AppController {
         }
         User loginUser = userService.getLoginUser(request);
         long id = appUpdateRequest.getId();
-        // 判断是否存在
         App oldApp = appService.getById(id);
         ThrowUtils.throwIf(oldApp == null, ErrorCode.NOT_FOUND_ERROR);
-        // 仅本人可更新
         if (!oldApp.getUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         App app = new App();
         app.setId(id);
         app.setAppName(appUpdateRequest.getAppName());
-        // 设置编辑时间
         app.setEditTime(LocalDateTime.now());
         boolean result = appService.updateById(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
@@ -109,12 +177,44 @@ public class AppController {
     }
 
     /**
-     * 删除应用（用户只能删除自己的应用）
+     * 删除应用接口
      *
-     * @param deleteRequest 删除请求
-     * @param request       请求
-     * @return 删除结果
+     * @author ko
+     * @since 2024-01-01
+     * @param deleteRequest 删除应用请求参数
+     * @param request HTTP请求对象
+     * @return 返回删除操作结果
+     *
+     * @example 请求示例:
+     * {
+     *   "id": 123456789
+     * }
      */
+    @Operation(
+            summary = "删除应用",
+            description = "用户删除自己的应用，管理员可删除任意应用",
+            tags = {"应用管理"},
+            method = "POST",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "删除应用请求参数",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = DeleteRequest.class)
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "删除成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40300", description = "无权限",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40400", description = "应用不存在",
+                            content = @Content)
+            }
+    )
     @PostMapping("/delete")
     public BaseResponse<Boolean> deleteApp(@RequestBody DeleteRequest deleteRequest, HttpServletRequest request) {
         if (deleteRequest == null || deleteRequest.getId() <= 0) {
@@ -122,10 +222,8 @@ public class AppController {
         }
         User loginUser = userService.getLoginUser(request);
         long id = deleteRequest.getId();
-        // 判断是否存在
         App oldApp = appService.getById(id);
         ThrowUtils.throwIf(oldApp == null, ErrorCode.NOT_FOUND_ERROR);
-        // 仅本人或管理员可删除
         if (!oldApp.getUserId().equals(loginUser.getId()) && !UserConstant.ADMIN_ROLE.equals(loginUser.getUserRole())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
@@ -134,41 +232,101 @@ public class AppController {
     }
 
     /**
-     * 根据 id 获取应用详情
+     * 获取应用详情接口
      *
-     * @param id      应用 id
-     * @return 应用详情
+     * @author ko
+     * @since 2024-01-01
+     * @param id 应用ID
+     * @return 返回应用详细信息
+     *
+     * @example 响应示例:
+     * {
+     *   "code": 0,
+     *   "data": {
+     *     "id": 123456789,
+     *     "appName": "任务记录网站",
+     *     "initPrompt": "创建一个简单的任务记录网站",
+     *     "userId": 100,
+     *     "codeGenType": 2,
+     *     "createTime": "2024-01-01T00:00:00",
+     *     "editTime": "2024-01-01T12:00:00"
+     *   },
+     *   "message": ""
+     * }
      */
+    @Operation(
+            summary = "获取应用详情",
+            description = "根据应用ID获取应用详细信息，包含应用名称、prompt、创建时间等",
+            tags = {"应用管理"},
+            method = "GET",
+            parameters = {
+                    @Parameter(name = "id", description = "应用ID", required = true, example = "123456789")
+            },
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "获取成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40400", description = "应用不存在",
+                            content = @Content)
+            }
+    )
     @GetMapping("/get/vo")
-    public BaseResponse<AppVO> getAppVOById(long id) {
+    public BaseResponse<AppVO> getAppVOById(
+            @Parameter(description = "应用ID", required = true, example = "123456789") long id) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
-        // 查询数据库
         App app = appService.getById(id);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
-        // 获取封装类（包含用户信息）
         return ResultUtils.success(appService.getAppVO(app));
     }
 
     /**
-     * 分页获取当前用户创建的应用列表
+     * 分页获取当前用户应用列表接口
      *
-     * @param appQueryRequest 查询请求
-     * @param request         请求
-     * @return 应用列表
+     * @author ko
+     * @since 2024-01-01
+     * @param appQueryRequest 查询请求参数
+     * @param request HTTP请求对象
+     * @return 返回当前用户的应用分页列表
+     *
+     * @example 请求示例:
+     * {
+     *   "current": 1,
+     *   "pageSize": 10
+     * }
      */
+    @Operation(
+            summary = "获取我的应用列表",
+            description = "分页获取当前登录用户创建的应用列表，每页最多20条",
+            tags = {"应用管理"},
+            method = "POST",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "应用分页查询请求参数",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AppQueryRequest.class)
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "查询成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content)
+            }
+    )
     @PostMapping("/my/list/page/vo")
     public BaseResponse<Page<AppVO>> listMyAppVOByPage(@RequestBody AppQueryRequest appQueryRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(request);
-        // 限制每页最多 20 个
         long pageSize = appQueryRequest.getPageSize();
         ThrowUtils.throwIf(pageSize > 20, ErrorCode.PARAMS_ERROR, "每页最多查询 20 个应用");
         long current = appQueryRequest.getCurrent();
-        // 只查询当前用户的应用
         appQueryRequest.setUserId(loginUser.getId());
         QueryWrapper queryWrapper = appService.getQueryWrapper(appQueryRequest);
         Page<App> appPage = appService.page(Page.of(current, pageSize), queryWrapper);
-        // 数据封装
         Page<AppVO> appVOPage = new Page<>(current, pageSize, appPage.getTotalRow());
         List<AppVO> appVOList = appService.getAppVOList(appPage.getRecords());
         appVOPage.setRecords(appVOList);
@@ -176,24 +334,49 @@ public class AppController {
     }
 
     /**
-     * 分页获取精选应用列表
+     * 分页获取精选应用列表接口
      *
-     * @param appQueryRequest 查询请求
-     * @return 精选应用列表
+     * @author ko
+     * @since 2024-01-01
+     * @param appQueryRequest 查询请求参数
+     * @return 返回精选应用分页列表
+     *
+     * @example 请求示例:
+     * {
+     *   "current": 1,
+     *   "pageSize": 10
+     * }
      */
+    @Operation(
+            summary = "获取精选应用列表",
+            description = "分页获取被标记为精选的应用列表，用于应用市场展示",
+            tags = {"应用管理"},
+            method = "POST",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "精选应用分页查询请求参数",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AppQueryRequest.class)
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "查询成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content)
+            }
+    )
     @PostMapping("/good/list/page/vo")
     public BaseResponse<Page<AppVO>> listGoodAppVOByPage(@RequestBody AppQueryRequest appQueryRequest) {
         ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR);
-        // 限制每页最多 20 个
         long pageSize = appQueryRequest.getPageSize();
         ThrowUtils.throwIf(pageSize > 20, ErrorCode.PARAMS_ERROR, "每页最多查询 20 个应用");
         long current = appQueryRequest.getCurrent();
-        // 只查询精选的应用
         appQueryRequest.setPriority(AppConstant.GOOD_APP_PRIORITY);
         QueryWrapper queryWrapper = appService.getQueryWrapper(appQueryRequest);
-        // 分页查询
         Page<App> appPage = appService.page(Page.of(current, pageSize), queryWrapper);
-        // 数据封装
         Page<AppVO> appVOPage = new Page<>(current, pageSize, appPage.getTotalRow());
         List<AppVO> appVOList = appService.getAppVOList(appPage.getRecords());
         appVOPage.setRecords(appVOList);
@@ -201,11 +384,43 @@ public class AppController {
     }
 
     /**
-     * 管理员删除应用
+     * 管理员删除应用接口
      *
-     * @param deleteRequest 删除请求
-     * @return 删除结果
+     * @author ko
+     * @since 2024-01-01
+     * @param deleteRequest 删除应用请求参数
+     * @return 返回删除操作结果
+     *
+     * @example 请求示例:
+     * {
+     *   "id": 123456789
+     * }
      */
+    @Operation(
+            summary = "管理员删除应用",
+            description = "管理员删除任意用户创建的应用",
+            tags = {"应用管理-管理员"},
+            method = "POST",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "删除应用请求参数",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = DeleteRequest.class)
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "删除成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40300", description = "无权限，需要管理员角色",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40400", description = "应用不存在",
+                            content = @Content)
+            }
+    )
     @PostMapping("/admin/delete")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> deleteAppByAdmin(@RequestBody DeleteRequest deleteRequest) {
@@ -213,7 +428,6 @@ public class AppController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         long id = deleteRequest.getId();
-        // 判断是否存在
         App oldApp = appService.getById(id);
         ThrowUtils.throwIf(oldApp == null, ErrorCode.NOT_FOUND_ERROR);
         boolean result = appService.removeById(id);
@@ -221,11 +435,45 @@ public class AppController {
     }
 
     /**
-     * 管理员更新应用
+     * 管理员更新应用接口
      *
-     * @param appAdminUpdateRequest 更新请求
-     * @return 更新结果
+     * @author ko
+     * @since 2024-01-01
+     * @param appAdminUpdateRequest 管理员更新应用请求参数
+     * @return 返回更新操作结果
+     *
+     * @example 请求示例:
+     * {
+     *   "id": 123456789,
+     *   "appName": "管理员更新的应用名称",
+     *   "priority": 1
+     * }
      */
+    @Operation(
+            summary = "管理员更新应用",
+            description = "管理员更新任意应用信息，包括应用名称、优先级等",
+            tags = {"应用管理-管理员"},
+            method = "POST",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "管理员更新应用请求参数",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AppAdminUpdateRequest.class)
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "更新成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40300", description = "无权限",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40400", description = "应用不存在",
+                            content = @Content)
+            }
+    )
     @PostMapping("/admin/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> updateAppByAdmin(@RequestBody AppAdminUpdateRequest appAdminUpdateRequest) {
@@ -233,12 +481,10 @@ public class AppController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         long id = appAdminUpdateRequest.getId();
-        // 判断是否存在
         App oldApp = appService.getById(id);
         ThrowUtils.throwIf(oldApp == null, ErrorCode.NOT_FOUND_ERROR);
         App app = new App();
         BeanUtil.copyProperties(appAdminUpdateRequest, app);
-        // 设置编辑时间
         app.setEditTime(LocalDateTime.now());
         boolean result = appService.updateById(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
@@ -246,11 +492,42 @@ public class AppController {
     }
 
     /**
-     * 管理员分页获取应用列表
+     * 管理员分页获取应用列表接口
      *
-     * @param appQueryRequest 查询请求
-     * @return 应用列表
+     * @author ko
+     * @since 2024-01-01
+     * @param appQueryRequest 查询请求参数
+     * @return 返回所有应用分页列表
+     *
+     * @example 请求示例:
+     * {
+     *   "current": 1,
+     *   "pageSize": 10
+     * }
      */
+    @Operation(
+            summary = "管理员获取应用列表",
+            description = "分页获取所有应用列表，用于后台管理",
+            tags = {"应用管理-管理员"},
+            method = "POST",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "应用分页查询请求参数",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AppQueryRequest.class)
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "查询成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40300", description = "无权限",
+                            content = @Content)
+            }
+    )
     @PostMapping("/admin/list/page/vo")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Page<AppVO>> listAppVOByPageByAdmin(@RequestBody AppQueryRequest appQueryRequest) {
@@ -259,7 +536,6 @@ public class AppController {
         long pageSize = appQueryRequest.getPageSize();
         QueryWrapper queryWrapper = appService.getQueryWrapper(appQueryRequest);
         Page<App> appPage = appService.page(Page.of(current, pageSize), queryWrapper);
-        // 数据封装
         Page<AppVO> appVOPage = new Page<>(current, pageSize, appPage.getTotalRow());
         List<AppVO> appVOList = appService.getAppVOList(appPage.getRecords());
         appVOPage.setRecords(appVOList);
@@ -267,45 +543,109 @@ public class AppController {
     }
 
     /**
-     * 管理员根据 id 获取应用详情
+     * 管理员获取应用详情接口
      *
-     * @param id 应用 id
-     * @return 应用详情
+     * @author ko
+     * @since 2024-01-01
+     * @param id 应用ID
+     * @return 返回应用详细信息
+     *
+     * @example 响应示例:
+     * {
+     *   "code": 0,
+     *   "data": {
+     *     "id": 123456789,
+     *     "appName": "任务记录网站",
+     *     "initPrompt": "创建一个简单的任务记录网站",
+     *     "userId": 100,
+     *     "codeGenType": 2,
+     *     "createTime": "2024-01-01T00:00:00",
+     *     "editTime": "2024-01-01T12:00:00"
+     *   },
+     *   "message": ""
+     * }
      */
+    @Operation(
+            summary = "管理员获取应用详情",
+            description = "管理员获取任意应用的详细信息",
+            tags = {"应用管理-管理员"},
+            method = "GET",
+            parameters = {
+                    @Parameter(name = "id", description = "应用ID", required = true, example = "123456789")
+            },
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "获取成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40300", description = "无权限",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40400", description = "应用不存在",
+                            content = @Content)
+            }
+    )
     @GetMapping("/admin/get/vo")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<AppVO> getAppVOByIdByAdmin(long id) {
+    public BaseResponse<AppVO> getAppVOByIdByAdmin(
+            @Parameter(description = "应用ID", required = true, example = "123456789") long id) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
-        // 查询数据库
         App app = appService.getById(id);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
-        // 获取封装类
         return ResultUtils.success(appService.getAppVO(app));
     }
 
     /**
-     * 应用聊天生成代码（流式 SSE）
+     * 应用聊天生成代码接口（流式SSE）
      *
-     * @param appId   应用 ID
+     * @author ko
+     * @since 2024-01-01
+     * @param appId 应用ID
      * @param message 用户消息
-     * @param request 请求对象
-     * @return 生成结果流
+     * @param request HTTP请求对象
+     * @return 返回SSE流，包含生成结果
+     *
+     * @example 请求示例:
+     * GET /app/chat/gen/code?appId=123456789&message=帮我创建一个登录页面
+     *
+     * @example 响应示例 (SSE流):
+     * data: {"d": "正在分析需求..."}
+     * data: {"d": "开始生成代码..."}
+     * data: {"d": "<!-- HTML代码 -->"}
+     * event: done
+     * data: ""
      */
+    @Operation(
+            summary = "AI聊天生成代码",
+            description = "通过AI对话生成代码，使用SSE流式返回生成进度和结果，支持HTML/CSS/JS多文件生成",
+            tags = {"AI代码生成"},
+            method = "GET",
+            parameters = {
+                    @Parameter(name = "appId", description = "应用ID", required = true, example = "123456789"),
+                    @Parameter(name = "message", description = "用户消息/需求描述", required = true, example = "帮我创建一个登录页面")
+            },
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "成功建立SSE连接",
+                            content = @Content(mediaType = "text/event-stream")),
+                    @ApiResponse(responseCode = "40000", description = "参数错误，如应用ID无效或消息为空",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40100", description = "未登录",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40400", description = "应用不存在",
+                            content = @Content)
+            }
+    )
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
-                                                       @RequestParam String message,
-                                                       HttpServletRequest request) {
-        // 参数校验
+    public Flux<ServerSentEvent<String>> chatToGenCode(
+            @Parameter(description = "应用ID", required = true, example = "123456789") @RequestParam Long appId,
+            @Parameter(description = "用户消息/需求描述", required = true, example = "帮我创建一个登录页面") @RequestParam String message,
+            HttpServletRequest request) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID无效");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
-        // 获取当前登录用户
         User loginUser = userService.getLoginUser(request);
-        // 调用服务生成代码（流式）
         Flux<String> contentFlux = appService.chatToGenCode(appId, message, loginUser);
-        // 转换为 ServerSentEvent 格式
         return contentFlux
                 .map(chunk -> {
-                    // 将内容包装成JSON对象
                     Map<String, String> wrapper = Map.of("d", chunk);
                     String jsonData = JSONUtil.toJsonStr(wrapper);
                     return ServerSentEvent.<String>builder()
@@ -313,7 +653,6 @@ public class AppController {
                             .build();
                 })
                 .concatWith(Mono.just(
-                        //发送结束事件
                         ServerSentEvent.<String>builder()
                                 .event("done")
                                 .data("")
@@ -322,90 +661,265 @@ public class AppController {
     }
 
     /**
-     * 应用部署
+     * 应用部署接口
      *
-     * @param appDeployRequest 部署请求
-     * @param request          请求
-     * @return 部署 URL
+     * @author ko
+     * @since 2024-01-01
+     * @param appDeployRequest 部署请求参数
+     * @param request HTTP请求对象
+     * @return 返回部署后的URL
+     *
+     * @example 请求示例:
+     * {
+     *   "appId": 123456789
+     * }
+     *
+     * @example 响应示例:
+     * {
+     *   "code": 0,
+     *   "data": "https://your-app.example.com",
+     *   "message": ""
+     * }
      */
+    @Operation(
+            summary = "部署应用",
+            description = "将生成的应用代码部署到服务器，返回部署后的访问URL",
+            tags = {"应用管理"},
+            method = "POST",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "应用部署请求参数",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AppDeployRequest.class)
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "部署成功，返回部署URL",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40100", description = "未登录",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40400", description = "应用不存在",
+                            content = @Content)
+            }
+    )
     @PostMapping("/deploy")
     public BaseResponse<String> deployApp(@RequestBody AppDeployRequest appDeployRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(appDeployRequest == null, ErrorCode.PARAMS_ERROR);
         Long appId = appDeployRequest.getAppId();
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
-        // 获取当前登录用户
         User loginUser = userService.getLoginUser(request);
-        // 调用服务部署应用
         String deployUrl = appService.deployApp(appId, loginUser);
         return ResultUtils.success(deployUrl);
     }
 
-
-
-
     /**
-     * 保存应用。
+     * 保存应用接口
      *
-     * @param app 应用
-     * @return {@code true} 保存成功，{@code false} 保存失败
+     * @author ko
+     * @since 2024-01-01
+     * @param app 应用实体
+     * @return 返回保存操作结果
+     *
+     * @example 请求示例:
+     * {
+     *   "appName": "测试应用",
+     *   "initPrompt": "初始化prompt"
+     * }
      */
-    @PostMapping("save")
-    public boolean save(@RequestBody App app) {
-        return appService.save(app);
+    @Operation(
+            summary = "保存应用",
+            description = "直接保存应用实体数据到数据库",
+            tags = {"应用管理"},
+            method = "POST",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "应用实体",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = App.class)
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "保存成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content)
+            }
+    )
+    @PostMapping("/save")
+    public BaseResponse<Boolean> save(@RequestBody App app) {
+        boolean result = appService.save(app);
+        return ResultUtils.success(result);
     }
 
     /**
-     * 根据主键删除应用。
+     * 删除应用接口（根据ID）
      *
-     * @param id 主键
-     * @return {@code true} 删除成功，{@code false} 删除失败
+     * @author ko
+     * @since 2024-01-01
+     * @param id 应用ID
+     * @return 返回删除操作结果
      */
-    @DeleteMapping("remove/{id}")
-    public boolean remove(@PathVariable Long id) {
-        return appService.removeById(id);
+    @Operation(
+            summary = "根据ID删除应用",
+            description = "根据应用ID直接删除应用",
+            tags = {"应用管理"},
+            method = "DELETE",
+            parameters = {
+                    @Parameter(name = "id", description = "应用ID", required = true, example = "123456789")
+            },
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "删除成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content)
+            }
+    )
+    @DeleteMapping("/remove/{id}")
+    public BaseResponse<Boolean> remove(@PathVariable Long id) {
+        boolean result = appService.removeById(id);
+        return ResultUtils.success(result);
     }
 
     /**
-     * 根据主键更新应用。
+     * 更新应用接口（根据ID）
      *
-     * @param app 应用
-     * @return {@code true} 更新成功，{@code false} 更新失败
+     * @author ko
+     * @since 2024-01-01
+     * @param app 应用实体
+     * @return 返回更新操作结果
+     *
+     * @example 请求示例:
+     * {
+     *   "id": 123456789,
+     *   "appName": "更新后的应用名称"
+     * }
      */
-    @PutMapping("update")
-    public boolean update(@RequestBody App app) {
-        return appService.updateById(app);
+    @Operation(
+            summary = "根据ID更新应用",
+            description = "根据应用ID更新应用信息",
+            tags = {"应用管理"},
+            method = "PUT",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "应用实体",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = App.class)
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "更新成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content)
+            }
+    )
+    @PutMapping("/update")
+    public BaseResponse<Boolean> update(@RequestBody App app) {
+        boolean result = appService.updateById(app);
+        return ResultUtils.success(result);
     }
 
     /**
-     * 查询所有应用。
+     * 查询所有应用接口
      *
-     * @return 所有数据
+     * @author ko
+     * @since 2024-01-01
+     * @return 返回所有应用列表
      */
-    @GetMapping("list")
-    public List<App> list() {
-        return appService.list();
+    @Operation(
+            summary = "查询所有应用",
+            description = "查询数据库中的所有应用记录",
+            tags = {"应用管理"},
+            method = "GET",
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "查询成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class)))
+            }
+    )
+    @GetMapping("/list")
+    public BaseResponse<List<App>> list() {
+        List<App> apps = appService.list();
+        return ResultUtils.success(apps);
     }
 
     /**
-     * 根据主键获取应用。
+     * 根据ID获取应用详情接口
      *
-     * @param id 应用主键
-     * @return 应用详情
+     * @author ko
+     * @since 2024-01-01
+     * @param id 应用ID
+     * @return 返回应用详情
+     *
+     * @example 响应示例:
+     * {
+     *   "code": 0,
+     *   "data": {
+     *     "id": 123456789,
+     *     "appName": "任务记录网站"
+     *   },
+     *   "message": ""
+     * }
      */
-    @GetMapping("getInfo/{id}")
-    public App getInfo(@PathVariable Long id) {
-        return appService.getById(id);
+    @Operation(
+            summary = "根据ID获取应用",
+            description = "根据应用ID获取应用完整信息",
+            tags = {"应用管理"},
+            method = "GET",
+            parameters = {
+                    @Parameter(name = "id", description = "应用ID", required = true, example = "123456789")
+            },
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "获取成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content)
+            }
+    )
+    @GetMapping("/getInfo/{id}")
+    public BaseResponse<App> getInfo(@PathVariable Long id) {
+        App app = appService.getById(id);
+        return ResultUtils.success(app);
     }
 
     /**
-     * 分页查询应用。
+     * 分页查询应用接口
      *
-     * @param page 分页对象
-     * @return 分页对象
+     * @author ko
+     * @since 2024-01-01
+     * @param page 分页参数
+     * @return 返回分页后的应用列表
      */
-    @GetMapping("page")
-    public Page<App> page(Page<App> page) {
-        return appService.page(page);
+    @Operation(
+            summary = "分页查询应用",
+            description = "使用MyBatis-Flex分页插件查询应用列表",
+            tags = {"应用管理"},
+            method = "GET",
+            parameters = {
+                    @Parameter(name = "page", description = "分页对象，包含current和pageSize", required = true)
+            },
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "查询成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = BaseResponse.class))),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content)
+            }
+    )
+    @GetMapping("/page")
+    public BaseResponse<Page<App>> page(Page<App> page) {
+        Page<App> result = appService.page(page);
+        return ResultUtils.success(result);
     }
 
 }
