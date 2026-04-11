@@ -38,3 +38,4 @@ build/
 ### docker ###
 /docker/redis-docker/.env
 /docker/redis-docker/README.md
+/docker/redis-docker/redis-data/
