@@ -84,6 +84,14 @@
             <version>6.1.0</version>
         </dependency>
 
+        <!--腾讯云COS-->
+        <dependency>
+            <groupId>com.qcloud</groupId>
+            <artifactId>cos_api</artifactId>
+            <version>5.6.227</version>
+        </dependency>
+
+
         <!--Hutools 文档：https://doc.hutool.cn-->
         <dependency>
             <groupId>cn.hutool</groupId>
