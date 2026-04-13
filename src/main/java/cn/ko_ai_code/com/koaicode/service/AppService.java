@@ -1,6 +1,7 @@
 package cn.ko_ai_code.com.koaicode.service;
 
 import cn.ko_ai_code.com.koaicode.entity.User;
+import cn.ko_ai_code.com.koaicode.model.dto.app.AppAddRequest;
 import cn.ko_ai_code.com.koaicode.model.dto.app.AppQueryRequest;
 import cn.ko_ai_code.com.koaicode.model.vo.AppVO;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -16,6 +17,8 @@ import java.util.List;
  * @author ko
  */
 public interface AppService extends IService<App> {
+
+    Long createApp(AppAddRequest appAddRequest, User loginUser);
 
     AppVO getAppVO(App app);
 

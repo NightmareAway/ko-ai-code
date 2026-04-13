@@ -1,9 +1,10 @@
-package cn.ko_ai_code.com.koaicode.service;
+package cn.ko_ai_code.com.koaicode.ai;
 
 import cn.ko_ai_code.com.koaicode.ai.tools.FileWriteTool;
 import cn.ko_ai_code.com.koaicode.exception.BusinessException;
 import cn.ko_ai_code.com.koaicode.exception.ErrorCode;
 import cn.ko_ai_code.com.koaicode.model.enums.CodeGenTypeEnum;
+import cn.ko_ai_code.com.koaicode.service.ChatHistoryService;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;

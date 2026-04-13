@@ -1,4 +1,4 @@
-package cn.ko_ai_code.com.koaicode.service;
+package cn.ko_ai_code.com.koaicode.ai;
 
 import cn.ko_ai_code.com.koaicode.ai.model.HtmlCodeResult;
 import cn.ko_ai_code.com.koaicode.ai.model.MultiFileCodeResult;
