@@ -10,6 +10,9 @@ import cn.ko_ai_code.com.koaicode.ai.tools.ToolManager;
 import cn.ko_ai_code.com.koaicode.constant.AppConstant;
 import cn.ko_ai_code.com.koaicode.core.builder.VueProjectBuilder;
 import cn.ko_ai_code.com.koaicode.entity.User;
+import cn.ko_ai_code.com.koaicode.exception.BusinessException;
+import cn.ko_ai_code.com.koaicode.exception.ErrorCode;
+import cn.ko_ai_code.com.koaicode.exception.ThrowUtils;
 import cn.ko_ai_code.com.koaicode.model.enums.ChatHistoryMessageTypeEnum;
 import cn.ko_ai_code.com.koaicode.service.ChatHistoryService;
 import jakarta.annotation.Resource;
@@ -118,5 +121,6 @@ public class JsonMessageStreamHandler {
             }
 
         }
+        throw new BusinessException(ErrorCode.SYSTEM_ERROR, "ai没有生成对应的枚举类");
     }
 }
