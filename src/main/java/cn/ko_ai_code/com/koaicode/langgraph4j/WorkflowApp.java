@@ -16,6 +16,7 @@ import static org.bsc.langgraph4j.StateGraph.END;
 import static org.bsc.langgraph4j.StateGraph.START;
 
 @Slf4j
+@Deprecated
 public class WorkflowApp {
 
     public static void main(String[] args) throws GraphStateException {

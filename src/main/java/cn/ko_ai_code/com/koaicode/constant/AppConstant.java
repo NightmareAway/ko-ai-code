@@ -27,4 +27,8 @@ public interface AppConstant {
      */
     String CODE_DEPLOY_HOST = "http://localhost";
 
+    /**
+     * 图片暂存地址
+     */
+    String PICTURE_TEMP_DIR = System.getProperty("user.dir") + "/tmp/pictures";
 }

@@ -20,6 +20,7 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
  * 简化版带状态定义的工作流 - 只定义状态结构，不实现具体流转
  */
 @Slf4j
+@Deprecated
 public class SimpleStatefulWorkflowApp {
 
     /**
