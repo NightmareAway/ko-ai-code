@@ -2,7 +2,7 @@ package cn.ko_ai_code.com.koaicode.langgraph4j.node;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
-import cn.ko_ai_code.com.koaicode.langgraph4j.CodeQualityCheckService;
+import cn.ko_ai_code.com.koaicode.langgraph4j.service.CodeQualityCheckService;
 import cn.ko_ai_code.com.koaicode.langgraph4j.model.dto.QualityResult;
 import cn.ko_ai_code.com.koaicode.langgraph4j.state.WorkflowContext;
 import cn.ko_ai_code.com.koaicode.utils.SpringContextUtil;

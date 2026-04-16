@@ -1,4 +1,4 @@
-package cn.ko_ai_code.com.koaicode.langgraph4j;
+package cn.ko_ai_code.com.koaicode.langgraph4j.service;
 
 import cn.ko_ai_code.com.koaicode.langgraph4j.model.dto.QualityResult;
 import dev.langchain4j.service.SystemMessage;

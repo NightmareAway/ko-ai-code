@@ -1,5 +1,6 @@
-package cn.ko_ai_code.com.koaicode.langgraph4j;
+package cn.ko_ai_code.com.koaicode.langgraph4j.service.factory;
 
+import cn.ko_ai_code.com.koaicode.langgraph4j.service.ImageCollectionService;
 import cn.ko_ai_code.com.koaicode.langgraph4j.tools.ImageSearchTool;
 import cn.ko_ai_code.com.koaicode.langgraph4j.tools.LogoGeneratorTool;
 import cn.ko_ai_code.com.koaicode.langgraph4j.tools.MermaidDiagramTool;

@@ -1,11 +1,10 @@
 package cn.ko_ai_code.com.koaicode.langgraph4j;
 
+import cn.ko_ai_code.com.koaicode.langgraph4j.service.ImageCollectionService;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class ImageCollectionServiceTest {
