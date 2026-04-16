@@ -3,7 +3,6 @@ package cn.ko_ai_code.com.koaicode.langgraph4j.node;
 import cn.ko_ai_code.com.koaicode.langgraph4j.model.dto.ImageCollectionPlan;
 import cn.ko_ai_code.com.koaicode.langgraph4j.model.dto.ImageResource;
 import cn.ko_ai_code.com.koaicode.langgraph4j.service.ImageCollectionPlanService;
-import cn.ko_ai_code.com.koaicode.langgraph4j.service.ImageCollectionService;
 import cn.ko_ai_code.com.koaicode.langgraph4j.state.WorkflowContext;
 import cn.ko_ai_code.com.koaicode.langgraph4j.tools.ImageSearchTool;
 import cn.ko_ai_code.com.koaicode.langgraph4j.tools.LogoGeneratorTool;
