@@ -1,6 +1,7 @@
 package cn.ko_ai_code.com.koaicode.langgraph4j.state;
 
 import cn.ko_ai_code.com.koaicode.langgraph4j.model.dto.ImageResource;
+import cn.ko_ai_code.com.koaicode.langgraph4j.model.dto.QualityResult;
 import cn.ko_ai_code.com.koaicode.model.enums.CodeGenTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -71,6 +72,11 @@ public class WorkflowContext implements Serializable {
      * 错误信息
      */
     private String errorMessage;
+
+    /**
+     * 质量检查结果
+     */
+    private QualityResult qualityResult;
 
     @Serial
     private static final long serialVersionUID = 1L;
