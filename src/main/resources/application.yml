@@ -1,34 +1,24 @@
 spring:
   application:
     name: ko-ai-code-backend
-    # session 配置
-    session:
-      store-type: redis
-      # session 30 天过期
-      timeout: 2592000
   # redis
   data:
     redis:
       host: localhost
       port: 6379
-      password:
       ttl: 3600
+  profiles:
+    active: local
   # mysql
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/ko_ai_code_database
     username: root
-    password: 123456
-  profiles:
-    active: local
+    password:
 server:
   port: 8123
   servlet:
     context-path: /api
-    # cookie 30 天过期
-    session:
-      cookie:
-        max-age: 2592000
 # springdoc-openapi
 springdoc:
   api-docs:
@@ -37,10 +27,52 @@ springdoc:
     enabled: true
     tags-sorter: alpha
     operations-sorter: alpha
-    path: /swagger-ui.html
   group-configs:
     - group: 'default'
       packages-to-scan: cn.ko_ai_code.com.koaicode.controller
+# AI
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: https://api.deepseek.com
+      api-key: <Your API Key>
+      model-name: deepseek-chat
+      log-requests: true
+      log-responses: true
+      max-tokens: 8192
+    #      strict-json-schema: true
+    #      response-format: json_object
+    streaming-chat-model:
+      base-url: https://api.deepseek.com
+      api-key: <Your API Key>
+      model-name: deepseek-chat
+      max-tokens: 8192
+      log-requests: true
+      log-responses: true
+    # 推理 AI 模型配置（用于复杂的推理任务）
+    reasoning-streaming-chat-model:
+      base-url: https://api.deepseek.com
+      api-key: <Your API Key>
+      model-name: deepseek-reasoner
+      max-tokens: 32768
+      temperature: 0.1
+      log-requests: true
+      log-responses: true
+    # 智能路由 AI 模型配置（用于简单的分类任务）
+    routing-chat-model:
+      base-url: https://api.deepseek.com
+      api-key: <Your API Key>
+      model-name: deepseek-chat
+      log-requests: true
+      log-responses: true
+# 添加 COS 对象存储配置（需要从腾讯云获取）
+cos:
+  client:
+    host:
+    secretId:
+    secretKey:
+    region:
+    bucket:
 # Pexels 图片搜索配置
 pexels:
   api-key: <Your API Key>
