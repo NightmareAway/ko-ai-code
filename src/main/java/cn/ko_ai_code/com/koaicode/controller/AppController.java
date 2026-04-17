@@ -14,6 +14,7 @@ import cn.ko_ai_code.com.koaicode.exception.BusinessException;
 import cn.ko_ai_code.com.koaicode.exception.ErrorCode;
 import cn.ko_ai_code.com.koaicode.exception.ThrowUtils;
 import cn.ko_ai_code.com.koaicode.model.dto.app.*;
+import cn.ko_ai_code.com.koaicode.model.dto.build.BuildStatusEvent;
 import cn.ko_ai_code.com.koaicode.model.enums.CodeGenTypeEnum;
 import cn.ko_ai_code.com.koaicode.model.vo.AppVO;
 import cn.ko_ai_code.com.koaicode.service.ProjectDownloadService;
@@ -35,6 +36,7 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import cn.ko_ai_code.com.koaicode.entity.App;
 import cn.ko_ai_code.com.koaicode.service.AppService;
+import cn.ko_ai_code.com.koaicode.service.BuildStatusSseService;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -63,6 +65,9 @@ public class AppController {
 
     @Resource
     private ProjectDownloadService projectDownloadService;
+
+    @Resource
+    private BuildStatusSseService buildStatusSseService;
 
     /**
      * 下载应用代码
@@ -958,6 +963,69 @@ public class AppController {
     public BaseResponse<Page<App>> page(Page<App> page) {
         Page<App> result = appService.page(page);
         return ResultUtils.success(result);
+    }
+
+    /**
+     * 订阅Vue项目构建状态
+     *
+     * @author ko
+     * @since 2024-01-01
+     * @param appId 应用ID
+     * @param request HTTP请求对象
+     * @return 返回SSE流，包含构建状态变更事件
+     *
+     * @example 响应示例 (SSE格式):
+     * data: {"appId":123,"status":"INSTALLING","message":"正在安装依赖包...","progress":20,"timestamp":"2024-01-01T10:00:00"}
+     * event: done
+     * data: ""
+     */
+    @Operation(
+            summary = "订阅构建状态",
+            description = "订阅Vue项目构建状态的实时变更，使用SSE流式返回构建进度",
+            tags = {"应用管理"},
+            method = "GET",
+            parameters = {
+                    @Parameter(name = "appId", description = "应用ID", required = true, example = "123456789")
+            },
+            responses = {
+                    @ApiResponse(responseCode = "0", description = "成功建立SSE连接",
+                            content = @Content(mediaType = "text/event-stream")),
+                    @ApiResponse(responseCode = "40000", description = "参数错误",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40100", description = "未登录",
+                            content = @Content),
+                    @ApiResponse(responseCode = "40400", description = "应用不存在",
+                            content = @Content)
+            }
+    )
+    @GetMapping(value = "/build/status/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> subscribeBuildStatus(
+            @Parameter(description = "应用ID", required = true, example = "123456789") @RequestParam Long appId,
+            HttpServletRequest request) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID无效");
+        // 权限校验：验证用户是否有权限订阅该应用的构建状态
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        User loginUser = userService.getLoginUser(request);
+        if (!app.getUserId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限订阅该应用构建状态");
+        }
+        
+        return buildStatusSseService.subscribeBuildStatus(appId)
+                .map(event -> {
+                    // 将事件转换为JSON字符串
+                    String jsonData = JSONUtil.toJsonStr(event);
+                    return ServerSentEvent.<String>builder()
+                            .event("build-status")
+                            .data(jsonData)
+                            .build();
+                })
+                .concatWith(Mono.just(
+                        ServerSentEvent.<String>builder()
+                                .event("done")
+                                .data("")
+                                .build()
+                ));
     }
 
 }

@@ -28,9 +28,6 @@ public class AiCodeGeneratorServiceFactory {
     @Resource(name = "openAiChatModel")
     private ChatModel chatModel;
 
-    @Resource
-    private StreamingChatModel openAiStreamingChatModel;
-
     @Resource(name = "reasoningStreamingChatModelPrototype")
     private StreamingChatModel reasoningStreamingChatModel;
 
