@@ -26,6 +26,7 @@ public class RedisChatMemoryStoreConfig {
                 .port(port)
                 .password(password)
                 .ttl(ttl)
+                .user("default")
                 .build();
     }
 }

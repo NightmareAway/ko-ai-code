@@ -84,3 +84,27 @@ dashscope:
   api-key: <Your API Key>
   image-model: wan2.2-t2i-flash
 
+# CORS 全局配置（可按环境覆盖，支持 OCP 扩展）
+app:
+  cors:
+    enabled: true
+    path-pattern: /**
+    # 精确来源（可选）
+    allowed-origins: [ ]
+    # 模式来源（推荐）
+    allowed-origin-patterns:
+      - http://localhost:*
+      - http://127.0.0.1:*
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+      - OPTIONS
+    allowed-headers:
+      - "*"
+    exposed-headers: [ ]
+    allow-credentials: true
+    max-age: 1800
+
