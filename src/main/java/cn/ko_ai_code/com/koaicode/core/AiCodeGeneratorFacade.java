@@ -85,8 +85,8 @@ public class AiCodeGeneratorFacade {
                 yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId);
             }
             case VUE_PROJECT -> {
-                Flux<String> codeStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
-                yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId);
+                TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
+                yield processTokenStream(tokenStream);
             }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
@@ -132,25 +132,36 @@ public class AiCodeGeneratorFacade {
     private Flux<String> processTokenStream(TokenStream tokenStream) {
         return Flux.create(sink -> {
             tokenStream.onPartialResponse((String partialResponse) -> {
-                        AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
-                        sink.next(JSONUtil.toJsonStr(aiResponseMessage));
+                        if (!sink.isCancelled()) {
+                            AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
+                            sink.next(JSONUtil.toJsonStr(aiResponseMessage));
+                        }
                     })
                     .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
-                        ToolRequestMessage toolRequestMessage = new ToolRequestMessage(toolExecutionRequest);
-                        sink.next(JSONUtil.toJsonStr(toolRequestMessage));
+                        if (!sink.isCancelled()) {
+                            ToolRequestMessage toolRequestMessage = new ToolRequestMessage(toolExecutionRequest);
+                            sink.next(JSONUtil.toJsonStr(toolRequestMessage));
+                        }
                     })
                     .onToolExecuted((ToolExecution toolExecution) -> {
-                        ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
-                        sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
+                        if (!sink.isCancelled()) {
+                            ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
+                            sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
+                        }
                     })
                     .onCompleteResponse((ChatResponse response) -> {
                         sink.complete();
                     })
                     .onError((Throwable error) -> {
-                        error.printStackTrace();
-                        sink.error(error);
+                        log.error("AI 生成代码失败: {}", error.getMessage());
+                        if (!sink.isCancelled()) {
+                            sink.error(error);
+                        }
                     })
                     .start();
+
+            sink.onCancel(() -> log.debug("SSE 客户端断开连接，TokenStream 结束"));
+            sink.onDispose(() -> log.debug("FluxSink disposed for VUE_PROJECT stream"));
         });
     }
 

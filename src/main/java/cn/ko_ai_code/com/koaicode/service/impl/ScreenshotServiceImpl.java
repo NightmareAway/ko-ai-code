@@ -23,6 +23,9 @@ public class ScreenshotServiceImpl implements ScreenshotService {
     @Resource
     private CosManager cosManager;
 
+    @Resource
+    private WebScreenshotUtils webScreenshotUtils;
+
     @Override
     public String generateAndUploadScreenshot(String webUrl) {
         // 检查网页URL是否为空，如果为空则抛出参数错误异常
@@ -31,7 +34,7 @@ public class ScreenshotServiceImpl implements ScreenshotService {
         log.info("开始生成网页截图，URL: {}", webUrl);
         // 1. 生成本地截图
         // 调用工具类方法保存网页截图到本地，并获取本地文件路径
-        String localScreenshotPath = WebScreenshotUtils.saveWebPageScreenshot(webUrl);
+        String localScreenshotPath = webScreenshotUtils.saveWebPageScreenshot(webUrl);
         // 检查本地截图路径是否为空，如果为空则抛出操作错误异常
         ThrowUtils.throwIf(StrUtil.isBlank(localScreenshotPath), ErrorCode.OPERATION_ERROR, "本地截图生成失败");
         try {

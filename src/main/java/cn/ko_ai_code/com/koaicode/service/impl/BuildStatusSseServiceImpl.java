@@ -65,6 +65,10 @@ public class BuildStatusSseServiceImpl implements BuildStatusSseService {
 
     @Override
     public void completeBuildStatus(Long appId) {
+        if (appId == null) {
+            log.warn("completeBuildStatus 收到 null appId，忽略");
+            return;
+        }
         Sinks.Many<BuildStatusEvent> sink = sinkMap.remove(appId);
         if (sink != null) {
             sink.tryEmitComplete();

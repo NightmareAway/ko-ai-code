@@ -687,20 +687,39 @@ public class AppController {
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
         User loginUser = userService.getLoginUser(request);
         Flux<String> contentFlux = appService.chatToGenCode(appId, message, loginUser);
-        return contentFlux
+
+        Flux<ServerSentEvent<String>> startFlux = Flux.just(
+                ServerSentEvent.<String>builder()
+                        .event("start")
+                        .data(JSONUtil.toJsonStr(Map.of("d", "正在生成代码，请稍候...")))
+                        .build()
+        );
+
+        Flux<ServerSentEvent<String>> bodyFlux = contentFlux
                 .map(chunk -> {
                     Map<String, String> wrapper = Map.of("d", chunk);
                     String jsonData = JSONUtil.toJsonStr(wrapper);
                     return ServerSentEvent.<String>builder()
                             .data(jsonData)
+                            .event("body")
                             .build();
                 })
-                .concatWith(Mono.just(
-                        ServerSentEvent.<String>builder()
-                                .event("done")
-                                .data("")
-                                .build()
-                ));
+                .onErrorResume(e -> {
+                    String errorMessage = StrUtil.blankToDefault(e.getMessage(), "生成代码失败");
+                    String errorData = JSONUtil.toJsonStr(Map.of("d", "生成失败：" + errorMessage));
+                    return Flux.just(ServerSentEvent.<String>builder()
+                            .event("error")
+                            .data(errorData)
+                            .build());
+                });
+
+        Flux<ServerSentEvent<String>> doneFlux = Flux.just(
+                ServerSentEvent.<String>builder()
+                        .event("done")
+                        .data("")
+                        .build()
+        );
+        return Flux.concat(startFlux, bodyFlux, doneFlux);
     }
 
     /**

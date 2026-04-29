@@ -136,7 +136,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
                 .like("appName", appName)
                 .like("cover", cover)
                 .like("initPrompt", initPrompt)
-                .eq("codeGenType", codeGenType)
+                .eq("codeGenType",codeGenType, StrUtil.isNotBlank(codeGenType))
                 .eq("deployKey", deployKey)
                 .eq("priority", priority)
                 .eq("userId", userId)

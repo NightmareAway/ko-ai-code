@@ -1,6 +1,5 @@
 package cn.ko_ai_code.com.koaicode.core.handler;
 
-import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
@@ -12,7 +11,6 @@ import cn.ko_ai_code.com.koaicode.core.builder.VueProjectBuilder;
 import cn.ko_ai_code.com.koaicode.entity.User;
 import cn.ko_ai_code.com.koaicode.exception.BusinessException;
 import cn.ko_ai_code.com.koaicode.exception.ErrorCode;
-import cn.ko_ai_code.com.koaicode.exception.ThrowUtils;
 import cn.ko_ai_code.com.koaicode.model.enums.ChatHistoryMessageTypeEnum;
 import cn.ko_ai_code.com.koaicode.service.ChatHistoryService;
 import jakarta.annotation.Resource;
@@ -52,6 +50,8 @@ public class JsonMessageStreamHandler {
                                long appId, User loginUser) {
         // 收集数据用于生成后端记忆格式
         StringBuilder chatHistoryStringBuilder = new StringBuilder();
+        // 收集工具返回内容
+
         // 用于跟踪已经见过的工具ID，判断是否是第一次调用
         Set<String> seenToolIds = new HashSet<>();
         return originFlux
@@ -79,9 +79,35 @@ public class JsonMessageStreamHandler {
      * 解析并收集 TokenStream 数据
      */
     private String handleJsonMessageChunk(String chunk, StringBuilder chatHistoryStringBuilder, Set<String> seenToolIds) {
-        // 解析 JSON
-        StreamMessage streamMessage = JSONUtil.toBean(chunk, StreamMessage.class);
+        // Vue 模式下模型可能返回纯文本片段，不能强制按 JSON 解析
+        if (StrUtil.isBlank(chunk)) {
+            return "";
+        }
+        String normalized = chunk.trim();
+        if (!normalized.startsWith("{")) {
+            chatHistoryStringBuilder.append(chunk);
+            return chunk;
+        }
+
+        StreamMessage streamMessage;
+        try {
+            streamMessage = JSONUtil.toBean(chunk, StreamMessage.class);
+        } catch (Exception e) {
+            log.warn("收到非标准 JSON 流块，按普通文本处理: {}", e.getMessage());
+            chatHistoryStringBuilder.append(chunk);
+            return chunk;
+        }
+        if (streamMessage == null || StrUtil.isBlank(streamMessage.getType())) {
+            String data = extractDataFromUnknownJson(chunk);
+            chatHistoryStringBuilder.append(data);
+            return data;
+        }
         StreamMessageTypeEnum typeEnum = StreamMessageTypeEnum.getEnumByValue(streamMessage.getType());
+        if (typeEnum == null) {
+            String data = extractDataFromUnknownJson(chunk);
+            chatHistoryStringBuilder.append(data);
+            return data;
+        }
         switch (typeEnum) {
             case AI_RESPONSE -> {
                 AiResponseMessage aiMessage = JSONUtil.toBean(chunk, AiResponseMessage.class);
@@ -110,7 +136,13 @@ public class JsonMessageStreamHandler {
             case TOOL_EXECUTED -> {
                 ToolExecutedMessage toolExecutedMessage = JSONUtil.toBean(chunk, ToolExecutedMessage.class);
                 String toolName = toolExecutedMessage.getName();
-                JSONObject jsonObject = JSONUtil.parseObj(toolExecutedMessage.getArguments());
+                JSONObject jsonObject;
+                try {
+                    jsonObject = JSONUtil.parseObj(toolExecutedMessage.getArguments());
+                } catch (Exception e) {
+                    log.warn("工具执行参数不是合法 JSON，忽略该工具结果: {}", e.getMessage());
+                    return "";
+                }
                 // 根据工具名称获取工具实例并生成相应的结果格式
                 BaseTool tool = toolManager.getTool(toolName);
                 String result = tool.generateToolExecutedResult(jsonObject);
@@ -122,5 +154,22 @@ public class JsonMessageStreamHandler {
 
         }
         throw new BusinessException(ErrorCode.SYSTEM_ERROR, "ai没有生成对应的枚举类");
+    }
+
+    private String extractDataFromUnknownJson(String chunk) {
+        try {
+            JSONObject obj = JSONUtil.parseObj(chunk);
+            String data = obj.getStr("data");
+            if (StrUtil.isNotBlank(data)) {
+                return data;
+            }
+            String d = obj.getStr("d");
+            if (StrUtil.isNotBlank(d)) {
+                return d;
+            }
+        } catch (Exception e) {
+            log.warn("未知 JSON 流块提取 data 失败: {}", e.getMessage());
+        }
+        return chunk;
     }
 }

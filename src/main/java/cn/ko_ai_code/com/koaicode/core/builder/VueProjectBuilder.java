@@ -162,7 +162,7 @@ public class VueProjectBuilder {
         log.info("Vue 项目构建成功，dist 目录: {}", distDir.getAbsolutePath());
         pushStatus(appId, BuildStatusEnum.SUCCESS, "项目构建成功", 100);
         // 完成构建状态流
-        if (buildStatusSseService != null) {
+        if (buildStatusSseService != null && appId != null) {
             buildStatusSseService.completeBuildStatus(appId);
         }
         return true;
@@ -193,7 +193,7 @@ public class VueProjectBuilder {
             } catch (Exception e) {
                 log.error("异步构建 Vue 项目时发生异常: {}", e.getMessage(), e);
                 pushStatus(appId, BuildStatusEnum.FAILED, "构建异常: " + e.getMessage(), 0);
-                if (buildStatusSseService != null) {
+                if (buildStatusSseService != null && appId != null) {
                     buildStatusSseService.completeBuildStatus(appId);
                 }
             }
