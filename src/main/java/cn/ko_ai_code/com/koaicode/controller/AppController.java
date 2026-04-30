@@ -14,9 +14,9 @@ import cn.ko_ai_code.com.koaicode.exception.BusinessException;
 import cn.ko_ai_code.com.koaicode.exception.ErrorCode;
 import cn.ko_ai_code.com.koaicode.exception.ThrowUtils;
 import cn.ko_ai_code.com.koaicode.model.dto.app.*;
-import cn.ko_ai_code.com.koaicode.model.dto.build.BuildStatusEvent;
-import cn.ko_ai_code.com.koaicode.model.enums.CodeGenTypeEnum;
 import cn.ko_ai_code.com.koaicode.model.vo.AppVO;
+import cn.ko_ai_code.com.koaicode.ratelimiter.annotation.RateLimit;
+import cn.ko_ai_code.com.koaicode.ratelimiter.enums.RateLimitType;
 import cn.ko_ai_code.com.koaicode.service.ProjectDownloadService;
 import cn.ko_ai_code.com.koaicode.service.UserService;
 import com.mybatisflex.core.paginate.Page;
@@ -678,6 +678,7 @@ public class AppController {
                             content = @Content)
             }
     )
+    @RateLimit(limitType = RateLimitType.USER, rate = 5,rateInterval = 60,message = "AI请求过于频繁，请稍后再试")
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatToGenCode(
             @Parameter(description = "应用ID", required = true, example = "123456789") @RequestParam Long appId,
