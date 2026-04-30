@@ -13,6 +13,7 @@ import cn.ko_ai_code.com.koaicode.exception.ErrorCode;
 import cn.ko_ai_code.com.koaicode.model.enums.CodeGenTypeEnum;
 import cn.ko_ai_code.com.koaicode.ai.AiCodeGeneratorService;
 import cn.ko_ai_code.com.koaicode.ai.AiCodeGeneratorServiceFactory;
+import cn.ko_ai_code.com.koaicode.utils.FolderCopyUtil;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.tool.ToolExecution;
@@ -85,6 +86,8 @@ public class AiCodeGeneratorFacade {
                 yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId);
             }
             case VUE_PROJECT -> {
+                FolderCopyUtil.copyFolder("tmp","template","tmp/code_output","vue_project_" + appId);
+                log.info("复制文件夹成功");
                 TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
                 yield processTokenStream(tokenStream);
             }
