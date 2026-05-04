@@ -122,12 +122,13 @@ public class CodeGenWorkflow {
     /**
      * 执行工作流（Flux 流式输出版本）
      */
-    public Flux<String> executeWorkflowWithFlux(String originalPrompt) {
+    public Flux<String> executeWorkflowWithFlux(String originalPrompt,Long appId) {
         return Flux.create(sink -> {
             Thread.startVirtualThread(() -> {
                 try {
                     CompiledGraph<MessagesState<String>> workflow = createWorkflow();
                     WorkflowContext initialContext = WorkflowContext.builder()
+                            .appId(appId)
                             .originalPrompt(originalPrompt)
                             .currentStep("初始化")
                             .build();
@@ -181,6 +182,14 @@ public class CodeGenWorkflow {
             return "event: error\ndata: {\"error\":\"格式化失败\"}\n\n";
         }
     }
+
+    /**
+     * 执行工作流（Flux 流式输出版本）
+     */
+    public Flux<String> executeWorkflowWithFlux(String originalPrompt) {
+        return executeWorkflowWithFlux(originalPrompt, 0L);
+    }
+
 
 
 }

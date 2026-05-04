@@ -2,6 +2,7 @@ package cn.ko_ai_code.com.koaicode.manager;
 
 import cn.ko_ai_code.com.koaicode.config.CosClientConfig;
 import com.qcloud.cos.COSClient;
+import com.qcloud.cos.model.CannedAccessControlList;
 import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.model.PutObjectResult;
 import jakarta.annotation.Resource;
@@ -34,6 +35,7 @@ public class CosManager {
      */
     public PutObjectResult putObject(String key, File file) {
         PutObjectRequest putObjectRequest = new PutObjectRequest(cosClientConfig.getBucket(), key, file);
+        putObjectRequest.setCannedAcl(CannedAccessControlList.PublicRead);
         return cosClient.putObject(putObjectRequest);
     }
 
@@ -48,8 +50,12 @@ public class CosManager {
         // 上传文件
         PutObjectResult result = putObject(key, file);
         if (result != null) {
-            // 构建访问URL
-            String url = String.format("%s%s", cosClientConfig.getHost(), key);
+            String host = cosClientConfig.getHost();
+            if (host.endsWith("/")) {
+                host = host.substring(0, host.length() - 1);
+            }
+            String normalizedKey = key.startsWith("/") ? key : "/" + key;
+            String url = host + normalizedKey;
             log.info("文件上传COS成功: {} -> {}", file.getName(), url);
             return url;
         } else {

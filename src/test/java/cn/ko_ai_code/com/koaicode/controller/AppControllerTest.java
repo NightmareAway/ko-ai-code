@@ -58,7 +58,7 @@ class AppControllerTest {
     void chatToGenCode() {
         HttpServletRequest request = mock(HttpServletRequest.class);
         userService.userLogin("kologram", "123456789", request);
-        Flux<ServerSentEvent<String>> serverSentEventFlux = appController.chatToGenCode(10L, "做一个公司官网，需要首页、关于我们、联系我们三个页面", request);
+        Flux<ServerSentEvent<String>> serverSentEventFlux = appController.chatToGenCode(10L, "做一个公司官网，需要首页、关于我们、联系我们三个页面", false, request);
     }
 
     @Test
@@ -66,7 +66,7 @@ class AppControllerTest {
     void chatToGenCode_SuccessWithMultipleChunks() {
         // Arrange
         when(userService.getLoginUser(request)).thenReturn(loginUser);
-        when(appService.chatToGenCode(validAppId, validMessage, loginUser))
+        when(appService.chatToGenCode(validAppId, validMessage, loginUser,false))
                 .thenReturn(Flux.just("正在分析需求...", "开始生成HTML...", "<div>登录页面</div>"));
 
         // Act
@@ -106,7 +106,7 @@ class AppControllerTest {
 
         // 验证 service 调用
         verify(userService).getLoginUser(request);
-        verify(appService).chatToGenCode(validAppId, validMessage, loginUser);
+        verify(appService).chatToGenCode(validAppId, validMessage, loginUser,false);
         verifyNoMoreInteractions(userService, appService);
     }
 
@@ -115,7 +115,7 @@ class AppControllerTest {
     void chatToGenCode_SuccessWithSingleChunk() {
         // Arrange
         when(userService.getLoginUser(request)).thenReturn(loginUser);
-        when(appService.chatToGenCode(validAppId, validMessage, loginUser))
+        when(appService.chatToGenCode(validAppId, validMessage, loginUser,false))
                 .thenReturn(Flux.just("<html></html>"));
 
         // Act
@@ -130,7 +130,7 @@ class AppControllerTest {
         assertEquals("done", events.get(2).event());
 
         verify(userService).getLoginUser(request);
-        verify(appService).chatToGenCode(validAppId, validMessage, loginUser);
+        verify(appService).chatToGenCode(validAppId, validMessage, loginUser,false);
     }
 
     @Test
@@ -138,7 +138,7 @@ class AppControllerTest {
     void chatToGenCode_SuccessWithEmptyChunks() {
         // Arrange
         when(userService.getLoginUser(request)).thenReturn(loginUser);
-        when(appService.chatToGenCode(validAppId, validMessage, loginUser))
+        when(appService.chatToGenCode(validAppId, validMessage, loginUser,false))
                 .thenReturn(Flux.just("", "  ", ""));
 
         // Act
@@ -162,11 +162,11 @@ class AppControllerTest {
     void chatToGenCode_WhenServiceThrowsException_ShouldReturnErrorEvent() {
         // Arrange
         when(userService.getLoginUser(request)).thenReturn(loginUser);
-        when(appService.chatToGenCode(validAppId, validMessage, loginUser))
+        when(appService.chatToGenCode(validAppId, validMessage, loginUser,false))
                 .thenReturn(Flux.error(new RuntimeException("AI服务调用超时")));
 
         // Act
-        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage, request);
+        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage, false, request);
         List<ServerSentEvent<String>> events = result.collectList().block();
 
         // Assert
@@ -192,11 +192,11 @@ class AppControllerTest {
     void chatToGenCode_WhenServiceThrowsExceptionWithoutMessage_ShouldUseDefaultMessage() {
         // Arrange
         when(userService.getLoginUser(request)).thenReturn(loginUser);
-        when(appService.chatToGenCode(validAppId, validMessage, loginUser))
+        when(appService.chatToGenCode(validAppId, validMessage, loginUser,false))
                 .thenReturn(Flux.error(new RuntimeException()));
 
         // Act
-        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage, request);
+        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage, false, request);
         List<ServerSentEvent<String>> events = result.collectList().block();
 
         // Assert
@@ -212,11 +212,11 @@ class AppControllerTest {
     void chatToGenCode_WhenServiceThrowsExceptionWithBlankMessage_ShouldUseDefaultMessage() {
         // Arrange
         when(userService.getLoginUser(request)).thenReturn(loginUser);
-        when(appService.chatToGenCode(validAppId, validMessage, loginUser))
+        when(appService.chatToGenCode(validAppId, validMessage, loginUser,false))
                 .thenReturn(Flux.error(new RuntimeException("")));
 
         // Act
-        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage, request);
+        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage,false, request);
         List<ServerSentEvent<String>> events = result.collectList().block();
 
         // Assert
@@ -234,7 +234,7 @@ class AppControllerTest {
     void chatToGenCode_WhenAppIdIsNull_ShouldThrowException() {
         // Act & Assert
         BusinessException exception = assertThrows(BusinessException.class, () ->
-                appController.chatToGenCode(null, validMessage, request));
+                appController.chatToGenCode(null, validMessage, false, request));
 
         assertEquals(ErrorCode.PARAMS_ERROR.getCode(), exception.getCode());
         assertEquals("应用ID无效", exception.getMessage());
@@ -248,7 +248,7 @@ class AppControllerTest {
     void chatToGenCode_WhenAppIdIsZero_ShouldThrowException() {
         // Act & Assert
         BusinessException exception = assertThrows(BusinessException.class, () ->
-                appController.chatToGenCode(0L, validMessage, request));
+                appController.chatToGenCode(0L, validMessage, false, request));
 
         assertEquals(ErrorCode.PARAMS_ERROR.getCode(), exception.getCode());
         assertEquals("应用ID无效", exception.getMessage());
@@ -260,7 +260,7 @@ class AppControllerTest {
     void chatToGenCode_WhenAppIdIsNegative_ShouldThrowException() {
         // Act & Assert
         BusinessException exception = assertThrows(BusinessException.class, () ->
-                appController.chatToGenCode(-1L, validMessage, request));
+                appController.chatToGenCode(-1L, validMessage, false, request));
 
         assertEquals(ErrorCode.PARAMS_ERROR.getCode(), exception.getCode());
         assertEquals("应用ID无效", exception.getMessage());
@@ -272,7 +272,7 @@ class AppControllerTest {
     void chatToGenCode_WhenMessageIsNull_ShouldThrowException() {
         // Act & Assert
         BusinessException exception = assertThrows(BusinessException.class, () ->
-                appController.chatToGenCode(validAppId, null, request));
+                appController.chatToGenCode(validAppId, null,false,  request));
 
         assertEquals(ErrorCode.PARAMS_ERROR.getCode(), exception.getCode());
         assertEquals("用户消息不能为空", exception.getMessage());
@@ -284,7 +284,7 @@ class AppControllerTest {
     void chatToGenCode_WhenMessageIsEmpty_ShouldThrowException() {
         // Act & Assert
         BusinessException exception = assertThrows(BusinessException.class, () ->
-                appController.chatToGenCode(validAppId, "", request));
+                appController.chatToGenCode(validAppId, "", false, request));
 
         assertEquals(ErrorCode.PARAMS_ERROR.getCode(), exception.getCode());
         assertEquals("用户消息不能为空", exception.getMessage());
@@ -296,7 +296,7 @@ class AppControllerTest {
     void chatToGenCode_WhenMessageIsBlank_ShouldThrowException() {
         // Act & Assert
         BusinessException exception = assertThrows(BusinessException.class, () ->
-                appController.chatToGenCode(validAppId, "   \n  ", request));
+                appController.chatToGenCode(validAppId, "   \n  ",false, request));
 
         assertEquals(ErrorCode.PARAMS_ERROR.getCode(), exception.getCode());
         assertEquals("用户消息不能为空", exception.getMessage());
@@ -313,7 +313,7 @@ class AppControllerTest {
 
         // Act & Assert
         BusinessException exception = assertThrows(BusinessException.class, () ->
-                appController.chatToGenCode(validAppId, validMessage, request));
+                appController.chatToGenCode(validAppId, validMessage, false, request));
 
         assertEquals(ErrorCode.NOT_LOGIN_ERROR.getCode(), exception.getCode());
         verify(userService).getLoginUser(request);

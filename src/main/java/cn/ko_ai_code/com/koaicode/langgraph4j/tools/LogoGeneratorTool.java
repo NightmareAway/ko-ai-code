@@ -1,7 +1,6 @@
 package cn.ko_ai_code.com.koaicode.langgraph4j.tools;
 
 import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.io.IORuntimeException;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpUtil;
@@ -56,32 +55,32 @@ public class LogoGeneratorTool {
             if (result != null && result.getOutput() != null && result.getOutput().getResults() != null) {
                 List<Map<String, String>> results = result.getOutput().getResults();
                 for (Map<String, String> imageResult : results) {
-                    String imageUrl = imageResult.get("url");
-                    if (StrUtil.isNotBlank(imageUrl)) {
-                        logoList.add(ImageResource.builder()
-                                .category(ImageCategoryEnum.LOGO)
-                                .description(description)
-                                .url(imageUrl)
-                                .build());
-                        // COS存储
+                    String dashScopeImageUrl = imageResult.get("url");
+                    if (StrUtil.isNotBlank(dashScopeImageUrl)) {
+                        String finalUrl = dashScopeImageUrl;
+                        // 下载到本地并上传 COS，优先使用 COS 持久 URL
                         String keyName = String.format("/logo/%s.png",
                                 RandomUtil.randomString(5));
                         File destFile = FileUtil.file(PICTURE_TEMP_DIR + keyName);
                         try {
-                            HttpUtil.downloadFile(imageUrl, destFile);
+                            HttpUtil.downloadFile(dashScopeImageUrl, destFile);
                             String cosUrl = cosManager.uploadFile(keyName, destFile);
-                            log.info("保存logo设计图到COS，COS地址为:" + cosUrl);
-                        } catch (Exception e) {
-                            String errorMessage = "下载" + imageUrl + "文件失败，保存路径：" +  destFile.toString() + "错误: " + e.getMessage();
-                            log.error(errorMessage, e);
-                        } finally {
-                            try {
-                                FileUtil.del(destFile);
-                            } catch (IORuntimeException e) {
-                                String errorMessage = "删除" + destFile.toString() + "文件失败";
-                                log.error(errorMessage, e);
+                            if (StrUtil.isNotBlank(cosUrl)) {
+                                finalUrl = cosUrl;
+                                log.info("Logo已上传至COS: {}", cosUrl);
+                            } else {
+                                log.warn("COS上传返回空URL，回退使用DashScope临时URL");
                             }
+                        } catch (Exception e) {
+                            log.error("下载/上传Logo文件失败，回退使用DashScope临时URL: {}", e.getMessage());
+                        } finally {
+                            FileUtil.del(destFile);
                         }
+                        logoList.add(ImageResource.builder()
+                                .category(ImageCategoryEnum.LOGO)
+                                .description(description)
+                                .url(finalUrl)
+                                .build());
                     }
                 }
             }

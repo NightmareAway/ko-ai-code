@@ -24,6 +24,11 @@ import java.util.Map;
 public class WorkflowContext implements Serializable {
 
     /**
+     * 应用 ID
+     */
+    private Long appId = 0L;
+
+    /**
      * WorkflowContext 在 MessagesState 中的存储key
      */
     public static final String WORKFLOW_CONTEXT_KEY = "workflowContext";
