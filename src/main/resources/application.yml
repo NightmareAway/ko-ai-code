@@ -9,6 +9,7 @@ spring:
     redis:
       host: localhost
       port: 6379
+      database: 0
       ttl: 3600
   profiles:
     active: local

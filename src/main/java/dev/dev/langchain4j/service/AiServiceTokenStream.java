@@ -4,6 +4,7 @@ import dev.langchain4j.Internal;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.guardrail.ChatExecutor;
 import dev.langchain4j.guardrail.GuardrailRequestParams;
 import dev.langchain4j.memory.ChatMemory;
@@ -15,6 +16,7 @@ import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.service.tool.ToolExecution;
 import dev.langchain4j.service.tool.ToolExecutor;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -137,6 +139,13 @@ public class AiServiceTokenStream implements TokenStream {
                 .chatRequest(chatRequest)
                 .build();
 
+        int maxSequentialToolsInvocations = readMaxSequentialToolsInvocations(context);
+        List<ChatMessage> systemMessages = new ArrayList<>();
+        for (ChatMessage msg : messages) {
+            if (msg instanceof SystemMessage) {
+                systemMessages.add(msg);
+            }
+        }
         var handler = new AiServiceStreamingResponseHandler(
                 chatExecutor,
                 context,
@@ -152,7 +161,10 @@ public class AiServiceTokenStream implements TokenStream {
                 toolSpecifications,
                 toolExecutors,
                 commonGuardrailParams,
-                methodKey);
+                methodKey,
+                maxSequentialToolsInvocations,
+                maxSequentialToolsInvocations,
+                systemMessages);
 
         if (contentsHandler != null && retrievedContents != null) {
             contentsHandler.accept(retrievedContents);
@@ -188,5 +200,16 @@ public class AiServiceTokenStream implements TokenStream {
         }
 
         return chatMemory;
+    }
+
+    private static int readMaxSequentialToolsInvocations(AiServiceContext context) {
+        try {
+            java.lang.reflect.Field field = context.toolService.getClass()
+                    .getDeclaredField("maxSequentialToolsInvocations");
+            field.setAccessible(true);
+            return (int) field.get(context.toolService);
+        } catch (Exception e) {
+            return 12;
+        }
     }
 }

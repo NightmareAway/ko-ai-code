@@ -86,8 +86,8 @@ public class AiCodeGeneratorFacade {
                 yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId);
             }
             case VUE_PROJECT -> {
-                FolderCopyUtil.copyFolder("tmp","template","tmp/code_output","vue_project_" + appId);
-                log.info("复制文件夹成功");
+                //FolderCopyUtil.copyFolder("tmp","template","tmp/code_output","vue_project_" + appId);
+                //log.info("复制文件夹成功");
                 TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
                 yield processTokenStream(tokenStream);
             }

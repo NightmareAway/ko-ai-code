@@ -57,6 +57,9 @@ class AiServiceStreamingResponseHandler implements StreamingChatResponseHandler 
     private final Map<String, ToolExecutor> toolExecutors;
     private final List<String> responseBuffer = new ArrayList<>();
     private final boolean hasOutputGuardrails;
+    private final int maxSequentialToolsInvocations;
+    private int sequentialToolsInvocationsLeft;
+    private final List<ChatMessage> systemMessages;
 
     AiServiceStreamingResponseHandler(
             ChatExecutor chatExecutor,
@@ -73,7 +76,10 @@ class AiServiceStreamingResponseHandler implements StreamingChatResponseHandler 
             List<ToolSpecification> toolSpecifications,
             Map<String, ToolExecutor> toolExecutors,
             GuardrailRequestParams commonGuardrailParams,
-            Object methodKey) {
+            Object methodKey,
+            int maxSequentialToolsInvocations,
+            int sequentialToolsInvocationsLeft,
+            List<ChatMessage> systemMessages) {
         this.chatExecutor = ensureNotNull(chatExecutor, "chatExecutor");
         this.context = ensureNotNull(context, "context");
         this.memoryId = ensureNotNull(memoryId, "memoryId");
@@ -93,6 +99,9 @@ class AiServiceStreamingResponseHandler implements StreamingChatResponseHandler 
         this.toolSpecifications = copy(toolSpecifications);
         this.toolExecutors = copy(toolExecutors);
         this.hasOutputGuardrails = context.guardrailService().hasOutputGuardrails(methodKey);
+        this.maxSequentialToolsInvocations = maxSequentialToolsInvocations;
+        this.sequentialToolsInvocationsLeft = sequentialToolsInvocationsLeft;
+        this.systemMessages = copy(systemMessages);
     }
 
     @Override
@@ -118,6 +127,12 @@ class AiServiceStreamingResponseHandler implements StreamingChatResponseHandler 
         addToMemory(aiMessage);
 
         if (aiMessage.hasToolExecutionRequests()) {
+            if (--sequentialToolsInvocationsLeft < 0) {
+                throw new RuntimeException(
+                        "Exceeded the maximum number of sequential tool invocations: "
+                                + maxSequentialToolsInvocations);
+            }
+
             for (ToolExecutionRequest toolExecutionRequest : aiMessage.toolExecutionRequests()) {
                 String toolName = toolExecutionRequest.name();
                 ToolExecutor toolExecutor = toolExecutors.get(toolName);
@@ -155,7 +170,10 @@ class AiServiceStreamingResponseHandler implements StreamingChatResponseHandler 
                     toolSpecifications,
                     toolExecutors,
                     commonGuardrailParams,
-                    methodKey);
+                    methodKey,
+                    maxSequentialToolsInvocations,
+                    sequentialToolsInvocationsLeft,
+                    systemMessages);
 
             context.streamingChatModel.chat(chatRequest, handler);
         } else {
@@ -213,7 +231,14 @@ class AiServiceStreamingResponseHandler implements StreamingChatResponseHandler 
     }
 
     private List<ChatMessage> messagesToSend(Object memoryId) {
-        return getMemory(memoryId).messages();
+        List<ChatMessage> memoryMessages = getMemory(memoryId).messages();
+        if (systemMessages == null || systemMessages.isEmpty()) {
+            return memoryMessages;
+        }
+        List<ChatMessage> allMessages = new ArrayList<>(systemMessages.size() + memoryMessages.size());
+        allMessages.addAll(systemMessages);
+        allMessages.addAll(memoryMessages);
+        return allMessages;
     }
 
     @Override
