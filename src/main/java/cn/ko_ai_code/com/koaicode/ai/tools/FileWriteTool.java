@@ -23,7 +23,7 @@ import java.nio.file.StandardOpenOption;
 @Component
 public class FileWriteTool extends BaseTool{
 
-    @Tool("写入文件到指定路径")
+    @Tool("创建新文件或完全重写已有文件。仅在需要创建新文件或彻底替换文件全部内容时使用此工具。若仅需修改文件部分内容，应使用 modifyFile。文件写入成功后无需重复调用")
     public String writeFile(
             @P("文件的相对路径")
             String relativeFilePath,
@@ -44,13 +44,17 @@ public class FileWriteTool extends BaseTool{
             if (parentDir != null) {
                 Files.createDirectories(parentDir);
             }
+            boolean fileExisted = Files.exists(path);
             // 写入文件内容
             Files.write(path, content.getBytes(),
                     StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING);
             log.info("成功写入文件: {}", path.toAbsolutePath());
             // 注意要返回相对路径，不能让 AI 把文件绝对路径返回给用户
-            return "文件写入成功: " + relativeFilePath;
+            if (fileExisted) {
+                return "文件已覆盖写入成功（该文件此前已存在并被更新）: " + relativeFilePath;
+            }
+            return "新文件创建成功: " + relativeFilePath;
         } catch (IOException e) {
             String errorMessage = "文件写入失败: " + relativeFilePath + ", 错误: " + e.getMessage();
             log.error(errorMessage, e);

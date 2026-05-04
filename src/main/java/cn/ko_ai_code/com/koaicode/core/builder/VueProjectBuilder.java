@@ -1,6 +1,6 @@
 package cn.ko_ai_code.com.koaicode.core.builder;
 
-import cn.hutool.core.util.RuntimeUtil;
+import cn.hutool.core.io.IoUtil;
 import cn.ko_ai_code.com.koaicode.model.dto.build.BuildStatusEvent;
 import cn.ko_ai_code.com.koaicode.model.enums.BuildStatusEnum;
 import cn.ko_ai_code.com.koaicode.service.BuildStatusSseService;
@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.util.concurrent.TimeUnit;
 
 
@@ -34,7 +36,7 @@ public class VueProjectBuilder {
     }
 
     /**
-     * 执行命令
+     * 执行命令，捕获 stdout/stderr 输出并记录到日志
      *
      * @param workingDir     工作目录
      * @param command        命令字符串
@@ -44,24 +46,38 @@ public class VueProjectBuilder {
     private boolean executeCommand(File workingDir, String command, int timeoutSeconds) {
         try {
             log.info("在目录 {} 中执行命令: {}", workingDir.getAbsolutePath(), command);
-            Process process = RuntimeUtil.exec(
-                    null,
-                    workingDir,
-                    command.split("\\s+") // 命令分割为数组
-            );
-            // 等待进程完成，设置超时
+            ProcessBuilder pb = new ProcessBuilder(command.split("\\s+"));
+            pb.directory(workingDir);
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            StringBuilder output = new StringBuilder();
+            Thread readerThread = new Thread(() -> {
+                try (InputStream is = process.getInputStream()) {
+                    String text = IoUtil.read(is, Charset.defaultCharset());
+                    output.append(text);
+                } catch (Exception e) {
+                    log.warn("读取进程输出时异常: {}", e.getMessage());
+                }
+            }, "cmd-reader-" + System.currentTimeMillis());
+            readerThread.start();
+
             boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
             if (!finished) {
-                log.error("命令执行超时（{}秒），强制终止进程", timeoutSeconds);
+                log.error("命令执行超时（{}秒），强制终止进程。已捕获的输出:\n{}", timeoutSeconds, output);
                 process.destroyForcibly();
+                readerThread.interrupt();
                 return false;
             }
+            readerThread.join(TimeUnit.SECONDS.toMillis(10));
+
             int exitCode = process.exitValue();
             if (exitCode == 0) {
                 log.info("命令执行成功: {}", command);
+                log.debug("命令输出:\n{}", output);
                 return true;
             } else {
-                log.error("命令执行失败，退出码: {}", exitCode);
+                log.error("命令执行失败，退出码: {}。完整输出:\n{}", exitCode, output);
                 return false;
             }
         } catch (Exception e) {

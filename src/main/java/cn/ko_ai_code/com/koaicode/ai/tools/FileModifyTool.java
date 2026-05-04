@@ -22,7 +22,7 @@ import java.nio.file.StandardOpenOption;
 @Component
 public class FileModifyTool extends BaseTool {
 
-    @Tool("修改文件内容，用新内容替换指定的旧内容")
+    @Tool("修改文件中的部分内容，用newContent替换文件中匹配的oldContent。仅适用于局部修改，不适合创建新文件或全量替换")
     public String modifyFile(
             @P("文件的相对路径")
             String relativeFilePath,

@@ -1,8 +1,8 @@
 package cn.ko_ai_code.com.koaicode.langgraph4j.tools;
 
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.util.RandomUtil;
-import cn.hutool.core.util.RuntimeUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.system.SystemUtil;
 import cn.ko_ai_code.com.koaicode.exception.BusinessException;
@@ -17,9 +17,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -60,27 +62,54 @@ public class MermaidDiagramTool {
      * 将Mermaid代码转换为SVG图片
      */
     private File convertMermaidToSvg(String mermaidCode) {
-        // 创建临时输入文件
         File tempInputFile = FileUtil.createTempFile("mermaid_input_", ".mmd", true);
-        FileUtil.writeUtf8String(mermaidCode, tempInputFile);
-        // 创建临时输出文件
         File tempOutputFile = FileUtil.createTempFile("mermaid_output_", ".svg", true);
-        // 根据操作系统选择命令
-        String command = SystemUtil.getOsInfo().isWindows() ? "mmdc.cmd" : "mmdc";
-        // 构建命令
-        String cmdLine = String.format("%s -i %s -o %s -b transparent",
-                command,
-                tempInputFile.getAbsolutePath(),
-                tempOutputFile.getAbsolutePath()
-        );
-        // 执行命令
-        RuntimeUtil.execForStr(cmdLine);
-        // 检查输出文件
-        if (!tempOutputFile.exists() || tempOutputFile.length() == 0) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "Mermaid CLI 执行失败");
+        try {
+            FileUtil.writeUtf8String(mermaidCode, tempInputFile);
+            String command = SystemUtil.getOsInfo().isWindows() ? "mmdc.cmd" : "mmdc";
+            ProcessBuilder pb = new ProcessBuilder(
+                    command, "-i", tempInputFile.getAbsolutePath(),
+                    "-o", tempOutputFile.getAbsolutePath(),
+                    "-b", "transparent");
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            StringBuilder output = new StringBuilder();
+            Thread reader = new Thread(() -> {
+                try {
+                    output.append(IoUtil.read(process.getInputStream(), Charset.defaultCharset()));
+                } catch (Exception ignored) {
+                }
+            }, "mmdc-reader");
+            reader.start();
+
+            boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR,
+                        "Mermaid CLI 执行超时（30秒），输出: " + output);
+            }
+            reader.join(5000);
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR,
+                        "Mermaid CLI 执行失败，退出码: " + exitCode + "，输出: " + output);
+            }
+            if (!tempOutputFile.exists() || tempOutputFile.length() == 0) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR,
+                        "Mermaid CLI 执行完成但未生成有效输出文件");
+            }
+            FileUtil.del(tempInputFile);
+            return tempOutputFile;
+        } catch (BusinessException e) {
+            FileUtil.del(tempInputFile);
+            FileUtil.del(tempOutputFile);
+            throw e;
+        } catch (Exception e) {
+            FileUtil.del(tempInputFile);
+            FileUtil.del(tempOutputFile);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR,
+                    "Mermaid CLI 执行异常: " + e.getMessage());
         }
-        // 清理输入文件，保留输出文件供上传使用
-        FileUtil.del(tempInputFile);
-        return tempOutputFile;
     }
 }

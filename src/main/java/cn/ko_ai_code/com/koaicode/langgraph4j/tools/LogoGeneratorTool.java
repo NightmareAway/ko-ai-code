@@ -66,7 +66,7 @@ public class LogoGeneratorTool {
                         // COS存储
                         String keyName = String.format("/logo/%s.png",
                                 RandomUtil.randomString(5));
-                        File destFile = FileUtil.file(PICTURE_TEMP_DIR + keyName + ".png");
+                        File destFile = FileUtil.file(PICTURE_TEMP_DIR + keyName);
                         try {
                             HttpUtil.downloadFile(imageUrl, destFile);
                             String cosUrl = cosManager.uploadFile(keyName, destFile);

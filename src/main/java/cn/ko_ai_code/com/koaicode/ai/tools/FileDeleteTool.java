@@ -21,7 +21,7 @@ import java.nio.file.Paths;
 @Component
 public class FileDeleteTool extends BaseTool {
 
-    @Tool("删除指定路径的文件")
+    @Tool("删除指定路径的文件。用于移除不再需要的文件，如重构时清理旧文件。重要文件（如package.json、配置文件等）受保护无法删除")
     public String deleteFile(
             @P("文件的相对路径")
             String relativeFilePath,

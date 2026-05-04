@@ -39,7 +39,7 @@ public class FileDirReadTool extends BaseTool {
             ".log", ".tmp", ".cache", ".lock"
     );
 
-    @Tool("读取目录结构，获取指定目录下的所有文件和子目录信息")
+    @Tool("读取目录结构，列出指定目录下的所有文件和子目录。用于了解当前项目文件组成，确认哪些文件已创建、哪些尚待创建")
     public String readDir(
             @P("目录的相对路径，为空则读取整个项目结构")
             String relativeDirPath,

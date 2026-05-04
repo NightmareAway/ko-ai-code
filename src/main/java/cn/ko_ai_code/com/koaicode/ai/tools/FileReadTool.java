@@ -21,7 +21,7 @@ import java.nio.file.Paths;
 @Component
 public class FileReadTool extends BaseTool{
 
-    @Tool("读取指定路径的文件内容")
+    @Tool("读取指定路径文件的全部内容，返回文件文本。用于查看已有文件内容，为后续修改提供参考")
     public String readFile(
             @P("文件的相对路径")
             String relativeFilePath,
