@@ -77,6 +77,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     @Resource
     private AiCodeGenTypeRoutingServiceFactory aiCodeGenTypeRoutingServiceFactory;
 
+    @Resource
+    private CodeGenWorkflow codeGenWorkflow;
+
     @Override
     public Long createApp(AppAddRequest appAddRequest, User loginUser) {
         // 参数校验
@@ -187,14 +190,21 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         Flux<String> codeStream;
         if (agent) {
             // Agent 模式：使用工作流生成代码
-            codeStream = new CodeGenWorkflow().executeWorkflowWithFlux(message, appId);
+            // 判断是否为新建对话（chat_history 中仅有一条刚插入的用户消息则为新建）
+            long historyCount = chatHistoryService.count(
+                    QueryWrapper.create().eq("appId", appId));
+            boolean isNewConversation = (historyCount <= 1);
+            log.info("Agent 模式: appId={}, codeGenType={}, isNewConversation={}",
+                    appId, codeGenTypeEnum.getValue(), isNewConversation);
+            codeStream = codeGenWorkflow.executeWorkflowWithFlux(
+                    message, appId, codeGenTypeEnum, isNewConversation);
         } else {
             // 传统模式：调用 AI 生成代码（流式）
             codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
         }
 
-        // 7. 收集 AI 响应内容并在完成后记录到对话历史
-        return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser, codeGenTypeEnum);
+        // 7. 收集 AI 响应内容并在完成后记录到对话历史（agent 和传统模式统一走此通道）
+        return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser, codeGenTypeEnum, agent);
 
     }
 

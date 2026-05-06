@@ -683,7 +683,7 @@ public class AppController {
     public Flux<ServerSentEvent<String>> chatToGenCode(
             @Parameter(description = "应用ID", required = true, example = "123456789") @RequestParam Long appId,
             @Parameter(description = "用户消息/需求描述", required = true, example = "帮我创建一个登录页面") @RequestParam String message,
-            @RequestParam boolean agent,
+            @RequestParam(defaultValue = "false") boolean agent,
             HttpServletRequest request) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID无效");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");

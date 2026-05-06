@@ -70,7 +70,7 @@ class AppControllerTest {
                 .thenReturn(Flux.just("正在分析需求...", "开始生成HTML...", "<div>登录页面</div>"));
 
         // Act
-        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage, request);
+        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage, false, request);
         List<ServerSentEvent<String>> events = result.collectList().block();
 
         // Assert
@@ -119,7 +119,7 @@ class AppControllerTest {
                 .thenReturn(Flux.just("<html></html>"));
 
         // Act
-        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage, request);
+        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage, false, request);
         List<ServerSentEvent<String>> events = result.collectList().block();
 
         // Assert
@@ -142,7 +142,7 @@ class AppControllerTest {
                 .thenReturn(Flux.just("", "  ", ""));
 
         // Act
-        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage, request);
+        Flux<ServerSentEvent<String>> result = appController.chatToGenCode(validAppId, validMessage, false, request);
         List<ServerSentEvent<String>> events = result.collectList().block();
 
         // Assert

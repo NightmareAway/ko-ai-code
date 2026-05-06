@@ -28,6 +28,14 @@ public class ImageCollectorNode {
     public static AsyncNodeAction<MessagesState<String>> create() {
         return node_async(state -> {
             WorkflowContext context = WorkflowContext.getContext(state);
+
+            // 非新建对话时跳过图片收集，避免不必要的资源开销
+            if (!context.isNewConversation()) {
+                log.info("修改模式：跳过图片收集步骤");
+                context.setCurrentStep("跳过图片收集（修改模式）");
+                return WorkflowContext.saveContext(context);
+            }
+
             String originalPrompt = context.getOriginalPrompt();
             List<ImageResource> collectedImages = new ArrayList<>();
 

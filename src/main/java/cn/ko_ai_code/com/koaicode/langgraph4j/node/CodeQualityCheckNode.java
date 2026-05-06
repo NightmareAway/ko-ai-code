@@ -47,8 +47,10 @@ public class CodeQualityCheckNode {
                             .build();
                 } else {
                     // 2. 调用 AI 进行代码质量检查
+                    // 转义 {{ }} 防止 Vue/前端模板语法与 LangChain4j 模板引擎分隔符冲突
                     CodeQualityCheckService qualityCheckService = SpringContextUtil.getBean(CodeQualityCheckService.class);
-                    qualityResult = qualityCheckService.checkCodeQuality(codeContent);
+                    String safeCodeContent = codeContent.replace("{{", "{ {").replace("}}", "} }");
+                    qualityResult = qualityCheckService.checkCodeQuality(safeCodeContent);
                     log.info("代码质量检查完成 - 是否通过: {}", qualityResult.getIsValid());
                 }
             } catch (Exception e) {

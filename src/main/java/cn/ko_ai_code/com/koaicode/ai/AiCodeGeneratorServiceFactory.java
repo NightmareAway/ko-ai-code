@@ -108,7 +108,7 @@ public class AiCodeGeneratorServiceFactory {
                         .streamingChatModel(reasoningStreamingChatModel)
                         .chatMemoryProvider(memoryId -> chatMemory)
                         .tools(toolManager.getAllTools())
-                        .maxSequentialToolsInvocations(12)
+                        .maxSequentialToolsInvocations(50)
                         .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                                 toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
                         ))
@@ -122,7 +122,7 @@ public class AiCodeGeneratorServiceFactory {
                         .chatModel(chatModel)
                         .streamingChatModel(openAiStreamingChatModel)
                         .chatMemory(chatMemory)
-                        .maxSequentialToolsInvocations(12)
+                        .maxSequentialToolsInvocations(30)
                         .inputGuardrails(new PromptSafetyInputGuardrail()) //添加输入护轨
                         .build();
             }

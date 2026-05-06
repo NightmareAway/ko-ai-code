@@ -78,7 +78,9 @@ public class BuildStatusSseServiceImpl implements BuildStatusSseService {
 
     /**
      * 获取或创建 Sink
-     * 使用 multicast 模式支持多订阅者
+     * 使用 replay 模式确保新订阅者能接收到历史构建状态事件。
+     * 前端在代码生成 SSE done 事件后才订阅构建状态，
+     * replay().all() 保证届时所有已发生的构建事件都能被回放。
      *
      * @param appId 应用ID
      * @return Sink对象
@@ -86,7 +88,7 @@ public class BuildStatusSseServiceImpl implements BuildStatusSseService {
     private Sinks.Many<BuildStatusEvent> getOrCreateSink(Long appId) {
         return sinkMap.computeIfAbsent(appId, id -> {
             log.info("创建新的构建状态Sink，appId: {}", id);
-            return Sinks.many().multicast().onBackpressureBuffer();
+            return Sinks.many().replay().all();
         });
     }
 

@@ -64,6 +64,16 @@ public class WorkflowContext implements Serializable {
     private CodeGenTypeEnum generationType;
 
     /**
+     * 代码生成类型来源（"app" 表示来自应用配置，"ai_route" 表示 AI 动态路由）
+     */
+    private String codeGenTypeSource;
+
+    /**
+     * 是否为新建对话（true: 完整流程含图片搜索和提示词增强；false: 跳过初始化步骤）
+     */
+    private boolean isNewConversation;
+
+    /**
      * 生成的代码目录
      */
     private String generatedCodeDir;
@@ -85,6 +95,36 @@ public class WorkflowContext implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
+
+    // ========== 工厂方法 ==========
+
+    /**
+     * 创建新建对话的工作流上下文
+     */
+    public static WorkflowContext createNewContext(Long appId, String prompt, CodeGenTypeEnum codeGenType) {
+        return WorkflowContext.builder()
+                .appId(appId)
+                .originalPrompt(prompt)
+                .generationType(codeGenType)
+                .codeGenTypeSource("app")
+                .isNewConversation(true)
+                .currentStep("初始化")
+                .build();
+    }
+
+    /**
+     * 创建修改已有对话的工作流上下文
+     */
+    public static WorkflowContext createContinuationContext(Long appId, String prompt, CodeGenTypeEnum codeGenType) {
+        return WorkflowContext.builder()
+                .appId(appId)
+                .originalPrompt(prompt)
+                .generationType(codeGenType)
+                .codeGenTypeSource("app")
+                .isNewConversation(false)
+                .currentStep("初始化")
+                .build();
+    }
 
     // ========== 上下文操作方法 ==========
 

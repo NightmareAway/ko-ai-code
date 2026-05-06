@@ -1,6 +1,5 @@
 package cn.ko_ai_code.com.koaicode.langgraph4j;
 
-import cn.hutool.json.JSONUtil;
 import cn.ko_ai_code.com.koaicode.exception.BusinessException;
 import cn.ko_ai_code.com.koaicode.exception.ErrorCode;
 import cn.ko_ai_code.com.koaicode.langgraph4j.model.dto.QualityResult;
@@ -14,6 +13,7 @@ import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.NodeOutput;
 import org.bsc.langgraph4j.prebuilt.MessagesState;
 import org.bsc.langgraph4j.prebuilt.MessagesStateGraph;
+import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 import java.util.Map;
@@ -23,6 +23,7 @@ import static org.bsc.langgraph4j.StateGraph.START;
 import static org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
 
 @Slf4j
+@Component
 public class CodeGenWorkflow {
 
     /**
@@ -36,7 +37,7 @@ public class CodeGenWorkflow {
                     .addNode("prompt_enhancer", PromptEnhancerNode.create())
                     .addNode("router", RouterNode.create())
                     .addNode("code_generator", CodeGeneratorNode.create())
-                    .addNode("project_builder", ProjectBuilderNode.create())
+//                    .addNode("project_builder", ProjectBuilderNode.create())
                     .addNode("code_quality_check", CodeQualityCheckNode.create())
 
                     // 添加边
@@ -49,12 +50,12 @@ public class CodeGenWorkflow {
                     .addConditionalEdges("code_quality_check",
                             edge_async(this::routeAfterQualityCheck),
                             Map.of(
-                                    "build", "project_builder",   // 质检通过且需要构建
+                                    "build", END,   // 质检通过且需要构建(构建已经在controller里调用了，所以此处直接END)
                                     "skip_build", END,            // 质检通过但跳过构建
                                     "fail", "code_generator"      // 质检失败，重新生成
                             ))
 
-                    .addEdge("project_builder", END)
+//                    .addEdge("project_builder", END)
 
                     // 编译工作流
                     .compile();
@@ -64,27 +65,31 @@ public class CodeGenWorkflow {
     }
 
     /**
-     * 执行工作流
+     * 执行工作流（同步模式，用于测试和简单调用）
      */
     public WorkflowContext executeWorkflow(String originalPrompt) {
+        return executeWorkflow(originalPrompt, CodeGenTypeEnum.HTML, true);
+    }
+
+    /**
+     * 执行工作流（同步模式，带 codeGenType 和场景标识）
+     */
+    public WorkflowContext executeWorkflow(String originalPrompt, CodeGenTypeEnum codeGenType, boolean isNewConversation) {
         CompiledGraph<MessagesState<String>> workflow = createWorkflow();
 
-        // 初始化 WorkflowContext
-        WorkflowContext initialContext = WorkflowContext.builder()
-                .originalPrompt(originalPrompt)
-                .currentStep("初始化")
-                .build();
+        WorkflowContext initialContext = isNewConversation
+                ? WorkflowContext.createNewContext(0L, originalPrompt, codeGenType)
+                : WorkflowContext.createContinuationContext(0L, originalPrompt, codeGenType);
 
         GraphRepresentation graph = workflow.getGraph(GraphRepresentation.Type.MERMAID);
         log.info("工作流图:\n{}", graph.content());
-        log.info("开始执行代码生成工作流");
+        log.info("开始执行代码生成工作流, isNewConversation={}, codeGenType={}", isNewConversation, codeGenType.getValue());
 
         WorkflowContext finalContext = null;
         int stepCounter = 1;
         for (NodeOutput<MessagesState<String>> step : workflow.stream(
                 Map.of(WorkflowContext.WORKFLOW_CONTEXT_KEY, initialContext))) {
             log.info("--- 第 {} 步完成 ---", stepCounter);
-            // 显示当前状态
             WorkflowContext currentContext = WorkflowContext.getContext(step.state());
             if (currentContext != null) {
                 finalContext = currentContext;
@@ -120,74 +125,59 @@ public class CodeGenWorkflow {
     }
 
     /**
-     * 执行工作流（Flux 流式输出版本）
+     * 执行工作流（Flux 流式输出版本，带 codeGenType 和场景标识）。
+     * 以原始字符串流式输出工作流进度和代码生成内容，由上层 Controller 统一封装为 SSE 事件。
      */
-    public Flux<String> executeWorkflowWithFlux(String originalPrompt,Long appId) {
+    public Flux<String> executeWorkflowWithFlux(String originalPrompt, Long appId,
+                                                 CodeGenTypeEnum codeGenType, boolean isNewConversation) {
         return Flux.create(sink -> {
             Thread.startVirtualThread(() -> {
                 try {
+                    SseSinkHolder.setSink(sink);
+
                     CompiledGraph<MessagesState<String>> workflow = createWorkflow();
-                    WorkflowContext initialContext = WorkflowContext.builder()
-                            .appId(appId)
-                            .originalPrompt(originalPrompt)
-                            .currentStep("初始化")
-                            .build();
-                    sink.next(formatSseEvent("workflow_start", Map.of(
-                            "message", "开始执行代码生成工作流",
-                            "originalPrompt", originalPrompt
-                    )));
+                    WorkflowContext initialContext = isNewConversation
+                            ? WorkflowContext.createNewContext(appId, originalPrompt, codeGenType)
+                            : WorkflowContext.createContinuationContext(appId, originalPrompt, codeGenType);
+
                     GraphRepresentation graph = workflow.getGraph(GraphRepresentation.Type.MERMAID);
                     log.info("工作流图:\n{}", graph.content());
+                    log.info("开始执行代码生成工作流, isNewConversation={}, codeGenType={}",
+                            isNewConversation, codeGenType.getValue());
+
+                    sink.next("正在启动代码生成工作流，类型：" + codeGenType.getText());
 
                     int stepCounter = 1;
                     for (NodeOutput<MessagesState<String>> step : workflow.stream(
                             Map.of(WorkflowContext.WORKFLOW_CONTEXT_KEY, initialContext))) {
-                        log.info("--- 第 {} 步完成 ---", stepCounter);
                         WorkflowContext currentContext = WorkflowContext.getContext(step.state());
                         if (currentContext != null) {
-                            sink.next(formatSseEvent("step_completed", Map.of(
-                                    "stepNumber", stepCounter,
-                                    "currentStep", currentContext.getCurrentStep()
-                            )));
-                            log.info("当前步骤上下文: {}", currentContext);
+                            log.info("--- 第 {} 步完成: {} ---", stepCounter, currentContext.getCurrentStep());
+                            if (!"代码生成".equals(currentContext.getCurrentStep())) {
+                                sink.next("[步骤" + stepCounter + "] " + currentContext.getCurrentStep() + " 完成");
+                            }
                         }
                         stepCounter++;
                     }
-                    sink.next(formatSseEvent("workflow_completed", Map.of(
-                            "message", "代码生成工作流执行完成！"
-                    )));
+
+                    sink.next("代码生成工作流执行完成！");
                     log.info("代码生成工作流执行完成！");
                     sink.complete();
                 } catch (Exception e) {
                     log.error("工作流执行失败: {}", e.getMessage(), e);
-                    sink.next(formatSseEvent("workflow_error", Map.of(
-                            "error", e.getMessage(),
-                            "message", "工作流执行失败"
-                    )));
                     sink.error(e);
+                } finally {
+                    SseSinkHolder.clear();
                 }
             });
         });
     }
 
     /**
-     * 格式化 SSE 事件的辅助方法
-     */
-    private String formatSseEvent(String eventType, Object data) {
-        try {
-            String jsonData = JSONUtil.toJsonStr(data);
-            return "event: " + eventType + "\ndata: " + jsonData + "\n\n";
-        } catch (Exception e) {
-            log.error("格式化 SSE 事件失败: {}", e.getMessage(), e);
-            return "event: error\ndata: {\"error\":\"格式化失败\"}\n\n";
-        }
-    }
-
-    /**
-     * 执行工作流（Flux 流式输出版本）
+     * 执行工作流（Flux 流式输出版本，使用默认参数）
      */
     public Flux<String> executeWorkflowWithFlux(String originalPrompt) {
-        return executeWorkflowWithFlux(originalPrompt, 0L);
+        return executeWorkflowWithFlux(originalPrompt, 0L, CodeGenTypeEnum.HTML, true);
     }
 
 

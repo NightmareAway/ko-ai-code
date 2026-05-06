@@ -2,6 +2,7 @@ package cn.ko_ai_code.com.koaicode.langgraph4j.node;
 
 import cn.ko_ai_code.com.koaicode.constant.AppConstant;
 import cn.ko_ai_code.com.koaicode.core.AiCodeGeneratorFacade;
+import cn.ko_ai_code.com.koaicode.langgraph4j.SseSinkHolder;
 import cn.ko_ai_code.com.koaicode.langgraph4j.model.dto.QualityResult;
 import cn.ko_ai_code.com.koaicode.langgraph4j.state.WorkflowContext;
 import cn.ko_ai_code.com.koaicode.model.enums.CodeGenTypeEnum;
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.bsc.langgraph4j.action.AsyncNodeAction;
 import org.bsc.langgraph4j.prebuilt.MessagesState;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 
 import java.time.Duration;
 
@@ -19,6 +21,8 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 public class CodeGeneratorNode {
 
     public static AsyncNodeAction<MessagesState<String>> create() {
+        // 在当前虚拟线程中捕获 sink（避免 Reactor pipeline 切换线程后 ThreadLocal 丢失）
+        FluxSink<String> capturedSink = SseSinkHolder.getSink();
         return node_async(state -> {
             WorkflowContext context = WorkflowContext.getContext(state);
             log.info("执行节点: 代码生成");
@@ -29,12 +33,22 @@ public class CodeGeneratorNode {
             // 获取 AI 代码生成外观服务
             AiCodeGeneratorFacade codeGeneratorFacade = SpringContextUtil.getBean(AiCodeGeneratorFacade.class);
             log.info("开始生成代码，类型: {} ({})", generationType.getValue(), generationType.getText());
-            // 先使用固定的 appId (后续再整合到业务中)
-            Long appId = 0L;
-            // 调用流式代码生成
+            Long appId = context.getAppId();
+            // 调用流式代码生成，通过 ThreadLocal sink 将生成内容实时推送到 SSE 输出
             Flux<String> codeStream = codeGeneratorFacade.generateAndSaveCodeStream(userMessage, generationType, appId);
-            // 同步等待流式输出完成
-            codeStream.blockLast(Duration.ofMinutes(10)); // 最多等待 10 分钟
+            if (capturedSink == null) {
+                log.warn("SseSinkHolder 中未找到 FluxSink，代码生成内容将无法实时推送到前端。"
+                        + "当前线程: {}，请确认 CodeGeneratorNode 在 executeWorkflowWithFlux 的虚拟线程上下文中运行。",
+                        Thread.currentThread().getName());
+            }
+            // 同步等待流式输出完成，同时将每个 chunk 转发给前端
+            codeStream
+                    .doOnNext(chunk -> {
+                        if (capturedSink != null && !capturedSink.isCancelled()) {
+                            capturedSink.next(chunk);
+                        }
+                    })
+                    .blockLast(Duration.ofMinutes(10)); // 最多等待 10 分钟
             // 根据类型设置生成目录
             String generatedCodeDir = String.format("%s/%s_%s", AppConstant.CODE_OUTPUT_ROOT_DIR, generationType.getValue(), appId);
             log.info("AI 代码生成完成，生成目录: {}", generatedCodeDir);

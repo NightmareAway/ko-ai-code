@@ -19,6 +19,15 @@ public class PromptEnhancerNode {
         return node_async(state -> {
             WorkflowContext context = WorkflowContext.getContext(state);
             log.info("执行节点: 提示词增强");
+
+            // 非新建对话时跳过提示词增强，直接使用原始提示词
+            if (!context.isNewConversation()) {
+                log.info("修改模式：跳过提示词增强步骤");
+                context.setCurrentStep("跳过提示词增强（修改模式）");
+                context.setEnhancedPrompt(context.getOriginalPrompt());
+                return WorkflowContext.saveContext(context);
+            }
+
             // 获取原始提示词和图片列表
             String originalPrompt = context.getOriginalPrompt();
             String imageListStr = context.getImageListStr();
